@@ -1,566 +1,724 @@
-import { useState } from "react";
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pentest com Docker — UMC</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0f1117;--surface:#181c27;--card:#1e2333;--border:#2a3045;--border-bright:#3d4f6e;
+    --text:#e2e8f0;--muted:#8896aa;--dim:#4a5568;
+    --green:#4ade80;--green-dim:rgba(74,222,128,.1);
+    --cyan:#67e8f9;--cyan-dim:rgba(103,232,249,.1);
+    --red:#f87171;--red-dim:rgba(248,113,113,.1);
+    --yellow:#fbbf24;--yellow-dim:rgba(251,191,36,.1);
+    --orange:#fb923c;--purple:#a78bfa;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;line-height:1.6;padding-bottom:80px}
+  .hero{background:linear-gradient(135deg,#0f1117 0%,#111827 60%,#1a1f35 100%);border-bottom:1px solid var(--border);padding:48px 24px 40px;text-align:center;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-80px;left:50%;transform:translateX(-50%);width:600px;height:300px;background:radial-gradient(ellipse,rgba(74,222,128,.08) 0%,transparent 70%);pointer-events:none}
+  .hero-badge{display:inline-block;background:var(--green-dim);border:1px solid rgba(74,222,128,.3);color:var(--green);font-family:'JetBrains Mono',monospace;font-size:.7rem;padding:4px 14px;border-radius:20px;letter-spacing:.1em;margin-bottom:20px}
+  .hero h1{font-size:clamp(1.8rem,5vw,2.8rem);font-weight:700;margin-bottom:12px;letter-spacing:-.02em}
+  .hero h1 em{color:var(--green);font-style:normal}
+  .hero p{color:var(--muted);font-size:1rem;max-width:500px;margin:0 auto 28px}
+  .hero-chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .chip{background:var(--card);border:1px solid var(--border);padding:6px 14px;border-radius:8px;font-size:.82rem;color:var(--muted)}
+  .chip strong{color:var(--text)}
+  .aviso-wrap{max-width:760px;margin:32px auto 0;padding:0 20px}
+  .aviso{background:var(--red-dim);border:1px solid rgba(248,113,113,.25);border-left:4px solid var(--red);border-radius:8px;padding:16px 20px;font-size:.88rem;color:#f1c0c0;line-height:1.6}
+  .aviso strong{color:var(--red);display:block;margin-bottom:4px;font-size:.8rem;letter-spacing:.05em}
+  .launch-wrap{max-width:760px;margin:32px auto 0;padding:0 20px}
+  .launch{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--green);border-radius:12px;overflow:hidden}
+  .launch-hdr{padding:20px 24px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
+  .launch-hdr .icon{font-size:1.5rem}
+  .launch-hdr h2{font-size:1rem;font-weight:700;margin-bottom:2px}
+  .launch-hdr p{color:var(--muted);font-size:.82rem}
+  .launch-body{padding:20px 24px;display:flex;flex-direction:column;gap:16px}
+  .cmd-block{display:flex;flex-direction:column;gap:6px}
+  .cmd-label{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .cmd-label span{color:var(--green);font-weight:700}
+  .cmd-box{background:#080b10;border:1px solid var(--border);border-radius:8px;padding:14px 18px;font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--text);word-break:break-all;line-height:1.5}
+  .cmd-box .c-kw{color:var(--cyan)}.cmd-box .c-sub{color:var(--green)}.cmd-box .c-fl{color:var(--yellow)}.cmd-box .c-val{color:#93c5fd}
+  .cmd-explain{background:rgba(103,232,249,.04);border:1px solid rgba(103,232,249,.1);border-radius:6px;padding:10px 14px;font-size:.82rem;color:#9ab8c0;line-height:1.55}
+  .cmd-explain strong{color:var(--cyan)}
+  .separator{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:.75rem;font-family:'JetBrains Mono',monospace}
+  .separator::before,.separator::after{content:'';flex:1;height:1px;background:var(--border)}
+  .after-launch{background:var(--green-dim);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:12px 16px;font-size:.85rem;color:#a0d4a8;line-height:1.6}
+  .after-launch strong{color:var(--green)}
+  .wrap{max-width:760px;margin:0 auto;padding:0 20px}
+  .section-title{display:flex;align-items:center;gap:12px;margin:44px 0 16px;font-size:.72rem;font-family:'JetBrains Mono',monospace;letter-spacing:.15em;text-transform:uppercase;color:var(--green)}
+  .section-title .sn{background:var(--green-dim);border:1px solid rgba(74,222,128,.25);padding:3px 10px;border-radius:4px}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+  .phase-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
+  .phase-hdr{background:var(--surface);padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:14px}
+  .phase-num{font-family:'JetBrains Mono',monospace;font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:4px;flex-shrink:0;margin-top:3px;letter-spacing:.06em}
+  .pn-green{background:var(--green-dim);border:1px solid rgba(74,222,128,.25);color:var(--green)}
+  .pn-cyan{background:var(--cyan-dim);border:1px solid rgba(103,232,249,.25);color:var(--cyan)}
+  .pn-red{background:var(--red-dim);border:1px solid rgba(248,113,113,.25);color:var(--red)}
+  .pn-orange{background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.25);color:var(--orange)}
+  .phase-title{font-size:1rem;font-weight:700;margin-bottom:4px}
+  .phase-desc{color:var(--muted);font-size:.85rem;line-height:1.5}
+  .phase-time{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--muted);background:var(--bg);border:1px solid var(--border);padding:4px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+  .phase-body{padding:20px 22px}
+  .objetivo{background:var(--cyan-dim);border:1px solid rgba(103,232,249,.15);border-left:3px solid var(--cyan);border-radius:6px;padding:12px 16px;font-size:.85rem;color:#aaccd4;line-height:1.6;margin-bottom:20px}
+  .objetivo strong{color:var(--cyan);font-size:.72rem;letter-spacing:.08em;display:block;margin-bottom:4px}
+  .passo{margin-bottom:22px}
+  .passo-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .passo-num{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--green);background:var(--green-dim);border:1px solid rgba(74,222,128,.2);padding:2px 8px;border-radius:3px;flex-shrink:0}
+  .passo-titulo{font-weight:600;font-size:.95rem}
+  .terminal{background:#060910;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-family:'JetBrains Mono',monospace;font-size:.8rem;margin-bottom:8px}
+  .term-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:7px 14px;display:flex;align-items:center;gap:8px}
+  .tdots{display:flex;gap:5px}
+  .tdot{width:9px;height:9px;border-radius:50%}
+  .tdot.r{background:#ff5f57}.tdot.y{background:#febc2e}.tdot.g{background:#28c840}
+  .term-label{color:var(--dim);font-size:.63rem;flex:1;text-align:center;letter-spacing:.08em}
+  .term-body{padding:14px 18px}
+  .term-line{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}
+  .term-line:last-child{margin-bottom:0}
+  .prompt{color:var(--green);user-select:none;flex-shrink:0;padding-top:1px}
+  .code{color:var(--text);line-height:1.5;word-break:break-all}
+  .code .ck{color:var(--cyan)}.code .cs{color:var(--green)}.code .cf{color:var(--yellow)}.code .cv{color:#93c5fd}.code .ci{color:var(--orange)}
+  .term-out{color:var(--dim);font-size:.76rem;line-height:1.45;padding-left:2px}
+  .term-out.g{color:#3a9a4a}.term-out.r{color:#9a3040}.term-out.c{color:#3a8a97}.term-out.y{color:#9a7e30}
+  .explicacao{background:rgba(255,255,255,.02);border:1px solid var(--border);border-left:3px solid var(--border-bright);border-radius:6px;padding:10px 14px;font-size:.82rem;color:var(--muted);line-height:1.6;margin-top:4px}
+  .explicacao .eg{color:var(--green);font-weight:600}.explicacao .ec{color:var(--cyan);font-weight:600}.explicacao .eo{color:var(--orange);font-weight:600}.explicacao .et{color:var(--text);font-weight:600}
+  .box-tip{background:var(--yellow-dim);border:1px solid rgba(251,191,36,.2);border-left:3px solid var(--yellow);border-radius:6px;padding:11px 15px;margin-top:10px;font-size:.82rem;color:#cfc090;line-height:1.55}
+  .box-tip strong{color:var(--yellow);font-size:.7rem;letter-spacing:.06em;display:block;margin-bottom:3px}
+  .box-ok{background:var(--green-dim);border:1px solid rgba(74,222,128,.2);border-left:3px solid var(--green);border-radius:6px;padding:11px 15px;margin-top:10px;font-size:.82rem;color:#a0d0a8;line-height:1.55}
+  .box-ok strong{color:var(--green);font-size:.7rem;letter-spacing:.06em;display:block;margin-bottom:3px}
+  .box-warn{background:var(--red-dim);border:1px solid rgba(248,113,113,.2);border-left:3px solid var(--red);border-radius:6px;padding:11px 15px;margin-top:10px;font-size:.82rem;color:#d0a0a8;line-height:1.55}
+  .box-warn strong{color:var(--red);font-size:.7rem;letter-spacing:.06em;display:block;margin-bottom:3px}
+  .box-orange{background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.2);border-left:3px solid var(--orange);border-radius:6px;padding:11px 15px;margin-top:10px;font-size:.82rem;color:#d4b090;line-height:1.55}
+  .box-orange strong{color:var(--orange);font-size:.7rem;letter-spacing:.06em;display:block;margin-bottom:3px}
+  hr.div{border:none;border-top:1px solid var(--border);margin:18px 0}
+  .tabela{width:100%;border-collapse:collapse;font-size:.8rem;margin-top:10px}
+  .tabela th{background:var(--surface);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.08em;text-align:left;padding:9px 12px;border:1px solid var(--border)}
+  .tabela td{padding:8px 12px;border:1px solid var(--border);color:var(--muted);line-height:1.4;vertical-align:top}
+  .tabela tr:hover td{background:rgba(74,222,128,.02)}
+  .tabela td:first-child{font-family:'JetBrains Mono',monospace;color:var(--orange);font-weight:600}
+  .tabela td:nth-child(2){color:var(--green)}
+  .relatorio{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .rel-hdr{background:linear-gradient(135deg,#0d1a10,#131c28);border-bottom:1px solid var(--border);padding:20px 24px;display:flex;align-items:center;gap:14px}
+  .rel-hdr .shield{font-size:2rem}
+  .rel-hdr h3{font-family:'JetBrains Mono',monospace;font-size:.85rem;font-weight:700;color:var(--green);margin-bottom:3px;letter-spacing:.05em}
+  .rel-hdr p{color:var(--muted);font-size:.78rem}
+  .rel-body{padding:22px 24px;display:flex;flex-direction:column;gap:20px}
+  .rel-sec h4{font-family:'JetBrains Mono',monospace;font-size:.68rem;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .rel-sec h4::after{content:'';flex:1;height:1px;background:var(--border)}
+  .campo label{display:block;font-size:.68rem;color:var(--dim);font-family:'JetBrains Mono',monospace;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}
+  .fbox{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:11px 14px;font-size:.83rem;color:var(--muted);line-height:1.55;min-height:36px}
+  .fbox.tall{min-height:90px}
+  .fbox.ph{color:var(--border-bright);font-style:italic;font-size:.8rem}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:560px){.grid2{grid-template-columns:1fr}}
+  .campo{margin-bottom:10px}
+  .sev-row{display:flex;gap:7px;flex-wrap:wrap}
+  .sev{padding:5px 14px;border-radius:4px;font-size:.73rem;font-family:'JetBrains Mono',monospace;letter-spacing:.05em}
+  .sev.c{background:var(--red-dim);border:1px solid rgba(248,113,113,.3);color:var(--red)}
+  .sev.h{background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.3);color:var(--orange)}
+  .sev.m{background:var(--yellow-dim);border:1px solid rgba(251,191,36,.3);color:var(--yellow)}
+  .sev.l{background:var(--green-dim);border:1px solid rgba(74,222,128,.3);color:var(--green)}
+  .sev.i{background:var(--cyan-dim);border:1px solid rgba(103,232,249,.3);color:var(--cyan)}
+  .checklist{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:10px}
+  .checklist li{display:flex;align-items:flex-start;gap:10px;font-size:.86rem;color:var(--muted);line-height:1.5}
+  .checklist li .cbox{width:18px;height:18px;border:2px solid var(--border-bright);border-radius:4px;flex-shrink:0;margin-top:1px}
+  .checklist li span{color:var(--text)}
+  .footer{margin-top:56px;text-align:center;padding-top:24px;border-top:1px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--dim)}
+  .footer span{color:var(--green)}
+  @media(max-width:580px){.hero{padding:36px 16px 28px}.phase-hdr{flex-wrap:wrap;gap:8px}.phase-time{margin-left:0}.phase-body,.rel-body{padding:16px}}
+</style>
+</head>
+<body>
 
-const SETUP = [
-  {
-    num: 1,
-    emoji: "📦",
-    titulo: "Pré-requisitos",
-    descricao: "Antes de começar, verifique se sua máquina possui Docker e Docker Compose instalados.",
-    blocos: [
-      {
-        tipo: "cmd",
-        label: "Verifique o Docker",
-        codigo: "docker --version\ndocker compose version",
-        esperado: "Docker version 24.x.x\nDocker Compose version v2.x.x",
-      },
-      {
-        tipo: "info",
-        texto: "Não tem Docker? Baixe em https://docs.docker.com/get-docker/ e instale antes de continuar.",
-      },
-    ],
-  },
-  {
-    num: 2,
-    emoji: "🗂️",
-    titulo: "Crie a estrutura de pastas",
-    descricao: "Crie manualmente a estrutura de diretórios do projeto no terminal.",
-    blocos: [
-      {
-        tipo: "cmd",
-        label: "Linux / macOS",
-        codigo: "mkdir -p crypto-lab/alice crypto-lab/bob\ncd crypto-lab",
-      },
-      {
-        tipo: "cmd",
-        label: "Windows (PowerShell)",
-        codigo: "New-Item -ItemType Directory -Force -Path crypto-lab\\alice, crypto-lab\\bob\ncd crypto-lab",
-      },
-      {
-        tipo: "info",
-        texto: "A estrutura final deve ser: crypto-lab/ ├── docker-compose.yml ├── alice/ │   ├── Dockerfile │   └── alice.py └── bob/     ├── Dockerfile     └── bob.py",
-      },
-    ],
-  },
-  {
-    num: 3,
-    emoji: "📄",
-    titulo: "Crie os arquivos do projeto",
-    descricao: "Cole o conteúdo de cada arquivo conforme fornecido no material da atividade. Use um editor como VS Code, Nano ou Notepad.",
-    blocos: [
-      {
-        tipo: "cmd",
-        label: "Abrir VS Code na pasta (opcional)",
-        codigo: "code .",
-      },
-      {
-        tipo: "aviso",
-        texto: "Atenção: o arquivo Dockerfile é o MESMO para alice/ e bob/. Copie-o para as duas pastas. Lembre de ajustar o CMD para alice.py ou bob.py em cada um.",
-      },
-    ],
-  },
-];
+<div class="hero">
+  <div class="hero-badge">▮ UMC · LAB PENTEST · ADS / ES</div>
+  <h1>Pentest Básico<br>com <em>Docker</em></h1>
+  <p>Ambiente seguro e isolado para explorar ferramentas de segurança ofensiva — incluindo simulação de DoS.</p>
+  <div class="hero-chips">
+    <div class="chip">🐳 <strong>Docker</strong> no Windows</div>
+    <div class="chip">🔍 <strong>nmap · curl · ab</strong></div>
+    <div class="chip">🌐 <strong>localhost:8080</strong></div>
+    <div class="chip">⏱ <strong>~75 min</strong></div>
+  </div>
+</div>
 
-const ATO1 = [
-  {
-    num: 1,
-    emoji: "🚀",
-    titulo: "Suba os containers — Modo RSA",
-    descricao: "Execute o comando abaixo na raiz do projeto (pasta crypto-lab/). O Docker vai construir as imagens e iniciar Bob e Alice na rede interna.",
-    blocos: [
-      {
-        tipo: "cmd",
-        label: "Terminal — raiz do projeto",
-        codigo: "MODO=assimetrica docker-compose up --build",
-      },
-      {
-        tipo: "cmd",
-        label: "Windows (PowerShell)",
-        codigo: "$env:MODO=\"assimetrica\"; docker-compose up --build",
-      },
-      {
-        tipo: "info",
-        texto: "O flag --build força a reconstrução das imagens. Use-o sempre que editar um .py. Na primeira execução, o Docker vai baixar a imagem python:3.11-slim (~50 MB).",
-      },
-    ],
-  },
-  {
-    num: 2,
-    emoji: "⏳",
-    titulo: "Bob sobe e aguarda Alice",
-    descricao: "Bob é o servidor. Ele inicia primeiro (depends_on no docker-compose) e fica bloqueado aguardando uma conexão TCP na porta 9000.",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log esperado — container bob",
-        codigo: "=============================================\n  🐳 BOB — servidor criptográfico\n=============================================\n⏳ Aguardando Alice na porta 9000...",
-      },
-      {
-        tipo: "info",
-        texto: "Se Bob não aparecer, verifique se o Dockerfile de bob/ aponta para CMD [\"python\", \"-u\", \"bob.py\"].",
-      },
-    ],
-  },
-  {
-    num: 3,
-    emoji: "🔌",
-    titulo: "Alice conecta em Bob",
-    descricao: "Alice aguarda 1 segundo (time.sleep(1)) para Bob estar pronto, depois abre um socket TCP para o host 'bob' — que é resolvido internamente pelo Docker na rede crypto-net.",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log esperado — container alice",
-        codigo: "=============================================\n  🐳 ALICE — cliente criptográfico\n  Modo: ASSIMETRICA\n=============================================\n\n🔌 Conectando em Bob (bob:9000)...\n✅ Conectada!",
-      },
-      {
-        tipo: "output",
-        label: "Log esperado — container bob (após conexão)",
-        codigo: "🤝 Alice conectou! (172.18.0.x)",
-      },
-      {
-        tipo: "conceito",
-        label: "Como o Docker resolve o nome 'bob'?",
-        texto: "Na rede bridge do Docker, cada container pode se comunicar com outro pelo nome do serviço definido no docker-compose.yml. É um DNS interno. Por isso alice.py usa HOST = \"bob\" e não um IP.",
-      },
-    ],
-  },
-  {
-    num: 4,
-    emoji: "🔑",
-    titulo: "Bob gera o par de chaves RSA-2048",
-    descricao: "Bob gera uma chave privada (fica em memória, nunca sai do container) e uma chave pública (será enviada para Alice).",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log esperado — container bob",
-        codigo: "🔑 [ATO 1] Modo ASSIMÉTRICO — RSA-OAEP\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚙️  Gerando par de chaves RSA-2048...",
-      },
-      {
-        tipo: "conceito",
-        label: "O que é RSA-2048?",
-        texto: "RSA é um algoritmo assimétrico. O número 2048 é o tamanho da chave em bits. Quanto maior, mais seguro — mas também mais lento. Para produção atual, recomenda-se 2048 ou 4096 bits.",
-      },
-    ],
-  },
-  {
-    num: 5,
-    emoji: "📤",
-    titulo: "Bob envia a chave pública para Alice",
-    descricao: "A chave pública é serializada no formato PEM e enviada pelo socket. Alice carrega o PEM e está pronta para cifrar.",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log esperado — container bob",
-        codigo: "📤 Chave pública enviada para Alice\n   (PEM, 451 bytes)",
-      },
-      {
-        tipo: "output",
-        label: "Log esperado — container alice",
-        codigo: "📥 Chave pública de Bob recebida!\n   (451 bytes de PEM)",
-      },
-      {
-        tipo: "info",
-        texto: "O formato PEM começa com -----BEGIN PUBLIC KEY----- e é legível em texto. Se quiser ver o conteúdo, adicione print(pub_pem.decode()) no bob.py.",
-      },
-    ],
-  },
-  {
-    num: 6,
-    emoji: "🔒",
-    titulo: "Alice cifra a mensagem com RSA-OAEP",
-    descricao: "Alice usa a chave pública recebida para cifrar a string. O resultado é um bloco de bytes aleatório — o ciphertext — que é enviado para Bob.",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log esperado — container alice",
-        codigo: "📝 Mensagem original: \"Olá Bob! Esta mensagem é secreta 🔒\"\n🔒 Cifrado (256 bytes):\n   a3f92c1d8b4e... (hex truncado)\n\n📤 Ciphertext enviado para Bob\n\n💡 Alice usou a chave PÚBLICA de Bob.\n   Somente Bob pode decifrar — com sua chave privada!",
-      },
-      {
-        tipo: "conceito",
-        label: "Por que o ciphertext muda a cada execução?",
-        texto: "O OAEP adiciona um padding aleatório antes de cifrar. Isso impede ataques de dicionário: mesmo cifrando a mesma mensagem duas vezes, os resultados são diferentes. É uma característica de segurança intencional.",
-      },
-    ],
-  },
-  {
-    num: 7,
-    emoji: "✅",
-    titulo: "Bob decifra com a chave privada",
-    descricao: "Bob usa sua chave privada (que nunca saiu do container) para decifrar o ciphertext e recuperar a mensagem original.",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log esperado — container bob",
-        codigo: "📥 Ciphertext recebido (256 bytes):\n   a3f92c1d8b4e... (hex truncado)\n\n✅ Mensagem decifrada com chave PRIVADA:\n   \"Olá Bob! Esta mensagem é secreta 🔒\"\n\n💡 Só Bob consegue decifrar — Alice nem mesmo conhece a chave privada!\n\n🏁 Comunicação encerrada.",
-      },
-    ],
-  },
-  {
-    num: 8,
-    emoji: "🧪",
-    titulo: "Desafio: tente quebrar a mensagem",
-    descricao: "Abra outro terminal e execute o Python localmente. Tente decifrar o ciphertext usando uma chave privada FALSA — o que acontece?",
-    blocos: [
-      {
-        tipo: "cmd",
-        label: "Execute no terminal local (Python 3 instalado)",
-        codigo: "python3 -c \"\nfrom cryptography.hazmat.primitives.asymmetric import rsa, padding\nfrom cryptography.hazmat.primitives import hashes\n\n# Gera uma chave FALSA — não é a chave de Bob!\nfake_key = rsa.generate_private_key(65537, 2048)\n\nciphertext = bytes.fromhex('COLE_O_HEX_AQUI')\nfake_key.decrypt(ciphertext, padding.OAEP(\n    mgf=padding.MGF1(algorithm=hashes.SHA256()),\n    algorithm=hashes.SHA256(), label=None))\n\"",
-      },
-      {
-        tipo: "output",
-        label: "Resultado esperado",
-        codigo: "ValueError: Decryption failed.\n(ou: cryptography.exceptions.InvalidKey)",
-      },
-      {
-        tipo: "aviso",
-        texto: "Este é o ponto central da criptografia assimétrica: sem a chave privada correta de Bob, é matematicamente inviável decifrar — mesmo conhecendo o algoritmo e tendo o ciphertext.",
-      },
-    ],
-  },
-];
+<div class="aviso-wrap">
+  <div class="aviso">
+    <strong>⚠️ AVISO LEGAL</strong>
+    Todos os testes são feitos <strong>dentro da sua própria máquina</strong>, em containers isolados. Usar essas ferramentas em redes externas é <strong>crime pela Lei 12.737/2012</strong>. Só execute o que está neste roteiro.
+  </div>
+</div>
 
-const ATO2 = [
-  {
-    num: 1,
-    emoji: "🔄",
-    titulo: "Derrube os containers e reinicie no modo AES",
-    descricao: "Pare os containers do Ato 1 e suba novamente com a variável MODO=simetrica.",
-    blocos: [
-      {
-        tipo: "cmd",
-        label: "Passo 1 — derrubar",
-        codigo: "docker-compose down",
-      },
-      {
-        tipo: "cmd",
-        label: "Passo 2 — subir no modo simétrico (Linux/macOS)",
-        codigo: "MODO=simetrica docker-compose up --build",
-      },
-      {
-        tipo: "cmd",
-        label: "Passo 2 — subir no modo simétrico (Windows PowerShell)",
-        codigo: "$env:MODO=\"simetrica\"; docker-compose up --build",
-      },
-      {
-        tipo: "output",
-        label: "Confirmação — log de Alice",
-        codigo: "  Modo: SIMETRICA",
-      },
-    ],
-  },
-  {
-    num: 2,
-    emoji: "🔑",
-    titulo: "Observe a diferença: sem troca de chaves",
-    descricao: "Desta vez, NÃO há troca de chaves entre os containers. Ambos já possuem a mesma constante CHAVE_SIMETRICA definida no código.",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log de Bob — modo simétrico",
-        codigo: "🔐 [ATO 2] Modo SIMÉTRICO — AES-256-GCM\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔑 Chave compartilhada: chave-super-secreta-32bytes!!!!!\n   (ambos já sabem a mesma chave!)",
-      },
-      {
-        tipo: "conceito",
-        label: "Por que 32 bytes?",
-        texto: "AES-256 exige uma chave de exatamente 256 bits = 32 bytes. Se usar 16 bytes, vira AES-128. A biblioteca cryptography valida o tamanho e lança erro se estiver incorreto.",
-      },
-    ],
-  },
-  {
-    num: 3,
-    emoji: "🎲",
-    titulo: "Alice gera o nonce e cifra",
-    descricao: "Alice gera 12 bytes aleatórios (nonce) a cada execução, cifra a mensagem com AES-256-GCM e envia nonce + ciphertext para Bob.",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log esperado — container alice",
-        codigo: "📝 Mensagem original: \"Olá Bob! Esta mensagem é secreta 🔒\"\n🔒 Cifrado (51 bytes):\n   nonce: 8f3a21c094b7e1d2a5f6c890\n   cipher: 3d7e9a1b4c2f...\n\n📤 Enviado para Bob\n\n💡 AES cifra E assina a mensagem (GCM = autenticado).\n   Bob detecta qualquer adulteração no ciphertext!",
-      },
-      {
-        tipo: "conceito",
-        label: "O que é o nonce?",
-        texto: "Nonce = Number used ONCE. É um valor aleatório que garante que dois textos idênticos gerem ciphertexts diferentes. No AES-GCM, o nonce tem 12 bytes (96 bits) e DEVE ser único para cada mensagem com a mesma chave.",
-      },
-    ],
-  },
-  {
-    num: 4,
-    emoji: "✅",
-    titulo: "Bob decifra com a chave simétrica",
-    descricao: "Bob usa o nonce recebido junto com a chave compartilhada para decifrar e autenticar a mensagem.",
-    blocos: [
-      {
-        tipo: "output",
-        label: "Log esperado — container bob",
-        codigo: "📥 Dados recebidos (51 bytes):\n   nonce: 8f3a21c094b7e1d2a5f6c890\n   cipher: 3d7e9a1b4c2f...\n\n✅ Mensagem decifrada com chave SIMÉTRICA:\n   \"Olá Bob! Esta mensagem é secreta 🔒\"\n\n💡 AES é muito mais rápido que RSA, por isso é usado após o handshake TLS!\n\n🏁 Comunicação encerrada.",
-      },
-    ],
-  },
-  {
-    num: 5,
-    emoji: "🧪",
-    titulo: "Desafio: adultere 1 byte do ciphertext",
-    descricao: "Edite bob.py para inverter o primeiro byte do ciphertext antes de decifrar. O AES-GCM deve detectar a adulteração e lançar erro.",
-    blocos: [
-      {
-        tipo: "cmd",
-        label: "Adicione esta linha em bob.py — antes do decrypt",
-        codigo: "# Logo após: nonce, ciphertext = dados[:12], dados[12:]\nciphertext = bytes([ciphertext[0] ^ 0xFF]) + ciphertext[1:]\nprint(\"⚠️  Ciphertext adulterado propositalmente!\")",
-      },
-      {
-        tipo: "cmd",
-        label: "Suba novamente",
-        codigo: "docker-compose down\nMODO=simetrica docker-compose up --build",
-      },
-      {
-        tipo: "output",
-        label: "Resultado esperado",
-        codigo: "⚠️  Ciphertext adulterado propositalmente!\ncryptography.exceptions.InvalidTag\n\n(Bob recusa a mensagem — integridade violada!)",
-      },
-      {
-        tipo: "aviso",
-        texto: "Isso é autenticação: o GCM gera uma tag criptográfica que cobre cada bit do ciphertext. Qualquer alteração, mesmo de 1 bit, invalida a tag e Bob rejeita a mensagem.",
-      },
-    ],
-  },
-  {
-    num: 6,
-    emoji: "💬",
-    titulo: "Reflexão final — conectando os dois atos",
-    descricao: "Você acabou de simular, na prática, os dois pilares da criptografia moderna. A questão é: como Alice e Bob combinariam a chave AES sem se encontrar pessoalmente?",
-    blocos: [
-      {
-        tipo: "conceito",
-        label: "A resposta: Diffie-Hellman + TLS",
-        texto: "No HTTPS, o servidor envia seu certificado (chave pública RSA/ECDSA). O cliente usa essa chave para negociar uma chave AES via Diffie-Hellman. Depois, toda a comunicação usa AES. O Ato 1 e o Ato 2 juntos formam exatamente o TLS handshake simplificado!",
-      },
-      {
-        tipo: "info",
-        texto: "Para explorar mais: pesquise 'TLS 1.3 handshake diagram' e identifique onde RSA e AES aparecem no fluxo.",
-      },
-    ],
-  },
-];
-
-const TIPO_CORES = {
-  cmd:     { bg: "#0d1117", border: "#30363d", label: "#58a6ff" },
-  output:  { bg: "#0a1628", border: "#1f3a5f", label: "#79c0ff" },
-  info:    { bg: "var(--color-background-secondary)", border: "var(--color-border-info)", label: "#58a6ff" },
-  aviso:   { bg: "var(--color-background-secondary)", border: "#d29922", label: "#e3b341" },
-  conceito:{ bg: "var(--color-background-secondary)", border: "var(--color-border-tertiary)", label: "var(--color-text-secondary)" },
-};
-
-function Bloco({ b }) {
-  const [copiado, setCopiar] = useState(false);
-  const cores = TIPO_CORES[b.tipo] || TIPO_CORES.info;
-
-  const copiar = () => {
-    navigator.clipboard.writeText(b.codigo || b.texto || "");
-    setCopiar(true);
-    setTimeout(() => setCopiar(false), 1500);
-  };
-
-  if (b.tipo === "info" || b.tipo === "aviso") return (
-    <div style={{
-      borderLeft: `3px solid ${cores.border}`,
-      background: cores.bg,
-      borderRadius: "0 8px 8px 0",
-      padding: "8px 12px",
-      fontSize: 13,
-      color: "var(--color-text-secondary)",
-      marginBottom: 10,
-      lineHeight: 1.6,
-    }}>
-      {b.tipo === "aviso" ? "⚠️ " : "ℹ️ "}{b.texto}
-    </div>
-  );
-
-  if (b.tipo === "conceito") return (
-    <div style={{
-      border: `1px solid ${cores.border}`,
-      background: cores.bg,
-      borderRadius: 8,
-      padding: "10px 14px",
-      marginBottom: 10,
-    }}>
-      <div style={{ fontSize: 12, fontWeight: 500, color: cores.label, marginBottom: 4 }}>📚 {b.label}</div>
-      <div style={{ fontSize: 13, color: "var(--color-text-primary)", lineHeight: 1.6 }}>{b.texto}</div>
-    </div>
-  );
-
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        background: "#161b22", borderRadius: "8px 8px 0 0",
-        padding: "5px 12px", border: `1px solid ${cores.border}`, borderBottom: "none",
-      }}>
-        <span style={{ fontSize: 11, color: cores.label, fontWeight: 500 }}>
-          {b.tipo === "cmd" ? "$ " : ""}{b.label}
-        </span>
-        {b.codigo && (
-          <button onClick={copiar} style={{
-            background: "none", border: "none", cursor: "pointer",
-            fontSize: 11, color: "#8b949e", padding: "2px 6px",
-          }}>
-            {copiado ? "✓ copiado" : "copiar"}
-          </button>
-        )}
+<div class="launch-wrap">
+  <div class="launch">
+    <div class="launch-hdr">
+      <div class="icon">🚀</div>
+      <div>
+        <h2>Subindo o laboratório — 2 comandos no PowerShell</h2>
+        <p>Execute um de cada vez. Aguarde o primeiro terminar antes de rodar o segundo.</p>
       </div>
-      <pre style={{
-        background: cores.bg,
-        border: `1px solid ${cores.border}`,
-        borderRadius: "0 0 8px 8px",
-        padding: "10px 14px",
-        fontSize: 12,
-        fontFamily: "monospace",
-        color: b.tipo === "output" ? "#79c0ff" : "#e6edf3",
-        overflowX: "auto",
-        margin: 0,
-        lineHeight: 1.65,
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-all",
-      }}>{b.codigo}</pre>
     </div>
-  );
-}
-
-function StepCard({ step, ativo, onClick }) {
-  return (
-    <div onClick={onClick} style={{
-      border: `1.5px solid ${ativo ? "var(--color-border-primary)" : "var(--color-border-tertiary)"}`,
-      borderRadius: 12, padding: "14px 16px", marginBottom: 8,
-      cursor: "pointer",
-      background: ativo ? "var(--color-background-secondary)" : "transparent",
-      transition: "all 0.15s",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{
-          width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
-          background: ativo ? "var(--color-text-primary)" : "var(--color-background-secondary)",
-          color: ativo ? "var(--color-background-primary)" : "var(--color-text-secondary)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 12, fontWeight: 600,
-        }}>{step.num}</span>
-        <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)" }}>
-          {step.emoji} {step.titulo}
-        </span>
-      </div>
-
-      {ativo && (
-        <div style={{ marginTop: 14 }}>
-          <p style={{ fontSize: 13, color: "var(--color-text-secondary)", lineHeight: 1.65, margin: "0 0 14px" }}>
-            {step.descricao}
-          </p>
-          {step.blocos.map((b, i) => <Bloco key={i} b={b} />)}
+    <div class="launch-body">
+      <div class="cmd-block">
+        <div class="cmd-label"><span>COMANDO 1</span> — Sobe o site alvo (DVWA)</div>
+        <div class="cmd-box">
+          <span class="c-kw">docker</span> <span class="c-sub">run</span> <span class="c-fl">-d</span> <span class="c-fl">--name</span> <span class="c-val">alvo-web</span> <span class="c-fl">-p</span> <span class="c-val">8080:80</span> <span class="c-val">vulnerables/web-dvwa</span>
         </div>
-      )}
-    </div>
-  );
-}
-
-export default function App() {
-  const [fase, setFase] = useState("setup");
-  const [stepAtivo, setStepAtivo] = useState(0);
-
-  const fases = { setup: SETUP, ato1: ATO1, ato2: ATO2 };
-  const steps = fases[fase];
-
-  const avancar = () => {
-    if (stepAtivo < steps.length - 1) { setStepAtivo(s => s + 1); return; }
-    if (fase === "setup") { setFase("ato1"); setStepAtivo(0); }
-    else if (fase === "ato1") { setFase("ato2"); setStepAtivo(0); }
-  };
-  const voltar = () => {
-    if (stepAtivo > 0) { setStepAtivo(s => s - 1); return; }
-    if (fase === "ato1") { setFase("setup"); setStepAtivo(SETUP.length - 1); }
-    else if (fase === "ato2") { setFase("ato1"); setStepAtivo(ATO1.length - 1); }
-  };
-  const fimDeTudo = fase === "ato2" && stepAtivo === ATO2.length - 1;
-  const temProximo = stepAtivo < steps.length - 1 || fase !== "ato2";
-
-  const FASES = [
-    { id: "setup", label: "⚙️ Configuração" },
-    { id: "ato1",  label: "🔑 Ato 1 — RSA" },
-    { id: "ato2",  label: "🔐 Ato 2 — AES" },
-  ];
-
-  return (
-    <div style={{ maxWidth: 680, margin: "0 auto", padding: "20px 16px", fontFamily: "var(--font-sans)" }}>
-
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: "var(--color-text-secondary)", letterSpacing: "0.05em", marginBottom: 4 }}>
-          ATIVIDADE PRÁTICA — REDES DE COMPUTADORES
+        <div class="cmd-explain">Inicia um site web vulnerável na porta <strong>8080</strong>. Aguarde aparecer um ID longo na tela (ex: <code>a3f1...</code>) — isso significa que funcionou.</div>
+      </div>
+      <div class="separator">depois que terminar, rode o próximo</div>
+      <div class="cmd-block">
+        <div class="cmd-label"><span>COMANDO 2</span> — Abre o Kali Linux (terminal do atacante)</div>
+        <div class="cmd-box">
+          <span class="c-kw">docker</span> <span class="c-sub">run</span> <span class="c-fl">-it</span> <span class="c-fl">--name</span> <span class="c-val">kali</span> <span class="c-fl">--network</span> <span class="c-val">host</span> <span class="c-val">kalilinux/kali-rolling</span> <span class="c-sub">bash</span>
         </div>
-        <h1 style={{ fontSize: 20, fontWeight: 500, color: "var(--color-text-primary)", margin: "0 0 4px" }}>
-          Criptografia com Docker + Python
-        </h1>
-        <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: 0 }}>
-          Passo a passo completo com comandos, outputs esperados e desafios.
-        </p>
+        <div class="cmd-explain">Abre um terminal do Kali Linux direto no PowerShell. O prompt vai mudar para <strong>root@kali#</strong>. A partir daqui você está "dentro" do Kali.</div>
       </div>
-
-      {/* Seletor de fase */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
-        {FASES.map(f => (
-          <button key={f.id} onClick={() => { setFase(f.id); setStepAtivo(0); }} style={{
-            flex: 1, padding: "8px 4px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-            border: `1.5px solid ${fase === f.id ? "var(--color-border-primary)" : "var(--color-border-tertiary)"}`,
-            background: fase === f.id ? "var(--color-background-secondary)" : "transparent",
-            color: fase === f.id ? "var(--color-text-primary)" : "var(--color-text-secondary)",
-            fontWeight: fase === f.id ? 500 : 400,
-          }}>{f.label}</button>
-        ))}
-      </div>
-
-      {/* Barra de progresso */}
-      <div style={{ display: "flex", gap: 3, marginBottom: 16, alignItems: "center" }}>
-        {steps.map((_, i) => (
-          <div key={i} onClick={() => setStepAtivo(i)} style={{
-            flex: 1, height: 4, borderRadius: 2, cursor: "pointer",
-            background: i <= stepAtivo ? "var(--color-border-primary)" : "var(--color-border-tertiary)",
-            transition: "background 0.2s",
-          }} />
-        ))}
-        <span style={{ fontSize: 11, color: "var(--color-text-secondary)", marginLeft: 6, whiteSpace: "nowrap" }}>
-          {stepAtivo + 1}/{steps.length}
-        </span>
-      </div>
-
-      {/* Steps */}
-      {steps.map((step, i) => (
-        <StepCard key={i} step={step} ativo={i === stepAtivo} onClick={() => setStepAtivo(i)} />
-      ))}
-
-      {/* Navegação */}
-      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-        <button onClick={voltar} disabled={fase === "setup" && stepAtivo === 0} style={{
-          flex: 1, padding: "10px 0", borderRadius: 10,
-          border: "1.5px solid var(--color-border-tertiary)", background: "transparent",
-          color: (fase === "setup" && stepAtivo === 0) ? "var(--color-text-tertiary)" : "var(--color-text-primary)",
-          fontSize: 13, cursor: (fase === "setup" && stepAtivo === 0) ? "default" : "pointer",
-        }}>← Anterior</button>
-
-        {!fimDeTudo ? (
-          <button onClick={avancar} style={{
-            flex: 2, padding: "10px 0", borderRadius: 10, border: "none",
-            background: "var(--color-text-primary)", color: "var(--color-background-primary)",
-            fontSize: 13, fontWeight: 500, cursor: "pointer",
-          }}>
-            {stepAtivo < steps.length - 1
-              ? "Próximo passo →"
-              : fase === "setup" ? "Iniciar Ato 1 — RSA →"
-              : "Ir para Ato 2 — AES →"}
-          </button>
-        ) : (
-          <div style={{
-            flex: 2, padding: "10px 0", borderRadius: 10, textAlign: "center",
-            background: "var(--color-background-secondary)",
-            border: "1.5px solid var(--color-border-tertiary)",
-            fontSize: 13, color: "var(--color-text-secondary)",
-          }}>✅ Atividade concluída!</div>
-        )}
+      <div class="after-launch">
+        ✅ Agora abra o navegador em <strong>http://localhost:8080</strong> — o site alvo já deve estar no ar!<br>
+        O terminal mostrando <strong>root@kali#</strong> é onde você vai rodar os próximos comandos.
       </div>
     </div>
-  );
-}
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- PRÉ-REQUISITO -->
+<div class="section-title"><span class="sn">PRE</span> Antes de começar — verificar Docker</div>
+<div class="phase-card">
+  <div class="phase-hdr">
+    <div class="phase-num pn-cyan">PRE</div>
+    <div>
+      <div class="phase-title">Confirmar que o Docker está funcionando</div>
+      <div class="phase-desc">Abra o PowerShell (não precisa ser administrador) e rode o comando abaixo.</div>
+    </div>
+  </div>
+  <div class="phase-body">
+    <div class="passo">
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">POWERSHELL — sua máquina</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">PS&gt;</span><span class="code"><span class="ck">docker</span> <span class="cs">version</span></span></div>
+          <div class="term-out c">Client: Docker Engine — versão X.X</div>
+          <div class="term-out c">Server: Docker Engine — versão X.X ← tem que aparecer isso!</div>
+        </div>
+      </div>
+      <div class="explicacao">
+        Se aparecer <span class="eg">Client</span> e <span class="eg">Server</span> com números de versão → tudo certo!<br>
+        Se der erro → abra o <span class="et">Docker Desktop</span>, aguarde o ícone da baleia ficar verde, e tente de novo.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 1 — NMAP -->
+<div class="section-title"><span class="sn">01</span> Fase 1 — Reconhecimento com nmap</div>
+<div class="phase-card">
+  <div class="phase-hdr">
+    <div class="phase-num pn-green">01</div>
+    <div>
+      <div class="phase-title">Descobrir portas e serviços do alvo</div>
+      <div class="phase-desc">O nmap é o scanner de rede mais usado do mundo. Vamos ver quais "portas" estão abertas no alvo e o que está rodando nelas.</div>
+    </div>
+    <div class="phase-time">⏱ 15 min</div>
+  </div>
+  <div class="phase-body">
+    <div class="objetivo"><strong>🎯 O QUE VOCÊ VAI DESCOBRIR</strong>Quais portas estão abertas, qual serviço roda em cada uma e qual versão do software está sendo usada.</div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">1.1</div><div class="passo-titulo">Instalar as ferramentas no Kali</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="cs">apt update</span> <span class="cf">-qq</span></span></div>
+          <div class="term-out c">← aguarde terminar, depois rode o próximo</div>
+        </div>
+      </div>
+      <div class="terminal" style="margin-top:8px">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="cs">apt install</span> <span class="cf">-y</span> <span class="cv">nmap curl apache2-utils</span></span></div>
+          <div class="term-out c">← aguarde terminar (~2 min). Vai aparecer muito texto, é normal.</div>
+        </div>
+      </div>
+      <div class="explicacao">
+        <span class="eg">apt update</span> atualiza a lista de programas disponíveis.<br>
+        <span class="eg">apt install -y nmap curl apache2-utils</span> instala as ferramentas da aula. O <span class="ec">apache2-utils</span> inclui o <strong>ab</strong> (Apache Benchmark) que usaremos na Fase 3.
+      </div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">1.2</div><div class="passo-titulo">Varredura básica — quais portas estão abertas?</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">nmap</span> <span class="ci">localhost</span></span></div>
+          <div class="term-out c">Starting Nmap scan...</div>
+          <div class="term-out g">PORT     STATE  SERVICE</div>
+          <div class="term-out g">8080/tcp open   http-proxy  ← nosso alvo!</div>
+        </div>
+      </div>
+      <div class="explicacao"><span class="eg">nmap localhost</span> verifica as 1000 portas mais comuns da sua máquina. <span class="ec">open</span> significa que a porta está aberta e aceitando conexões.</div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">1.3</div><div class="passo-titulo">Descobrir a versão do serviço — flag -sV</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">nmap</span> <span class="cf">-sV</span> <span class="cf">-p</span> <span class="cv">8080</span> <span class="ci">localhost</span></span></div>
+          <div class="term-out g">PORT     STATE SERVICE VERSION</div>
+          <div class="term-out g">8080/tcp open  http    Apache httpd 2.4.x ← versão revelada!</div>
+        </div>
+      </div>
+      <div class="explicacao"><span class="eg">-sV</span> pede para o nmap descobrir a <strong>versão exata</strong> do programa rodando.<br><span class="ec">-p 8080</span> foca só na porta 8080, assim fica mais rápido.</div>
+      <div class="box-tip"><strong>💡 POR QUE A VERSÃO IMPORTA?</strong>Cada versão de software tem vulnerabilidades públicas catalogadas. Saber a versão é o primeiro passo para saber como atacar — ou como defender.</div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">1.4</div><div class="passo-titulo">Scan completo — salvar resultado</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">nmap</span> <span class="cf">-sV</span> <span class="cf">-sC</span> <span class="cf">-p</span> <span class="cv">8080</span> <span class="ci">localhost</span> <span class="cf">-oN</span> <span class="cv">/tmp/scan-nmap.txt</span></span></div>
+          <div class="term-out c">| http-title: Damn Vulnerable Web Application</div>
+          <div class="term-out c">| http-methods: GET POST HEAD OPTIONS</div>
+          <div class="term-out y">| http-auth: Basic realm="DVWA"</div>
+        </div>
+      </div>
+      <div class="explicacao"><span class="eg">-sC</span> roda scripts automáticos: descobre título, métodos HTTP e mais.<br><span class="ec">-oN /tmp/scan-nmap.txt</span> salva o resultado — você vai precisar disso no relatório!</div>
+    </div>
+
+    <hr class="div">
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.05em">📖 REFERÊNCIA — PORTAS COMUNS E SEUS RISCOS</p>
+    <table class="tabela">
+      <thead><tr><th>PORTA</th><th>SERVIÇO</th><th>O QUE FAZ</th><th>RISCO</th></tr></thead>
+      <tbody>
+        <tr><td>22</td><td>SSH</td><td>Acesso remoto seguro</td><td style="color:var(--yellow)">Médio — alvo de brute force</td></tr>
+        <tr><td>80</td><td>HTTP</td><td>Site web sem criptografia</td><td style="color:var(--red)">Alto — tráfego exposto</td></tr>
+        <tr><td>443</td><td>HTTPS</td><td>Site web com criptografia</td><td style="color:var(--green)">Baixo — verifique o certificado</td></tr>
+        <tr><td>3306</td><td>MySQL</td><td>Banco de dados</td><td style="color:var(--red)">Alto — se acessível pela rede</td></tr>
+        <tr><td>8080</td><td>HTTP Alt</td><td>Servidor web alternativo</td><td style="color:var(--yellow)">Médio — painéis admin comuns aqui</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- FASE 2 — CURL -->
+<div class="section-title"><span class="sn">02</span> Fase 2 — Inspeção manual com curl</div>
+<div class="phase-card">
+  <div class="phase-hdr">
+    <div class="phase-num pn-cyan">02</div>
+    <div>
+      <div class="phase-title">Ver o que o servidor revela nos cabeçalhos HTTP</div>
+      <div class="phase-desc">O curl faz requisições HTTP e mostra exatamente o que o servidor responde. É como inspecionar o "envelope" das mensagens entre navegador e servidor.</div>
+    </div>
+    <div class="phase-time">⏱ 15 min</div>
+  </div>
+  <div class="phase-body">
+    <div class="objetivo"><strong>🎯 O QUE VOCÊ VAI DESCOBRIR</strong>Os cabeçalhos HTTP revelam tecnologias usadas, versões de software e proteções de segurança ausentes — tudo sem precisar abrir o navegador.</div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">2.1</div><div class="passo-titulo">Ver os cabeçalhos do servidor</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">curl</span> <span class="cf">-I</span> <span class="cv">http://localhost:8080</span></span></div>
+          <div class="term-out c">HTTP/1.1 200 OK</div>
+          <div class="term-out c">Server: Apache/2.4.x  ← versão exposta!</div>
+          <div class="term-out c">X-Powered-By: PHP/7.x ← linguagem exposta!</div>
+          <div class="term-out r">← SEM: Strict-Transport-Security</div>
+          <div class="term-out r">← SEM: X-Frame-Options</div>
+          <div class="term-out r">← SEM: Content-Security-Policy</div>
+        </div>
+      </div>
+      <div class="explicacao"><span class="eg">-I</span> busca apenas os cabeçalhos, sem baixar toda a página.<br>Cada linha <span style="color:var(--red)">SEM:</span> indica um cabeçalho de segurança ausente — isso é uma vulnerabilidade real!</div>
+      <div class="box-warn"><strong>⚠️ CABEÇALHOS AUSENTES = VULNERABILIDADE</strong>Todo cabeçalho de segurança que falta é um achado. Anote no relatório com criticidade <strong>Médio</strong>.</div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">2.2</div><div class="passo-titulo">Ver o código HTML da página de login</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">curl</span> <span class="cv">http://localhost:8080/login.php</span></span></div>
+          <div class="term-out c">← aparece o HTML da página de login</div>
+        </div>
+      </div>
+      <div class="explicacao">Baixa o HTML da página de login. Procure as tags <span class="eg">form</span>, <span class="eg">input</span> e <span class="eg">action</span> — elas mostram como o formulário está estruturado.</div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">2.3</div><div class="passo-titulo">Testar login com credenciais padrão</div></div>
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:10px;line-height:1.6">Este comando tem várias partes. Digite <strong>tudo em uma linha só</strong> no terminal:</p>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali# (tudo em uma linha)</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">curl</span> <span class="cf">-X POST</span> <span class="cv">http://localhost:8080/login.php</span> <span class="cf">-d</span> <span class="cv">"username=admin&password=password&Login=Login"</span> <span class="cf">-v</span> <span class="cv">2>&1</span> | <span class="ck">grep</span> <span class="cv">"Location"</span></span></div>
+          <div class="term-out g">Location: index.php ← login aceito! Credencial padrão funcionou!</div>
+        </div>
+      </div>
+      <div class="explicacao"><span class="eg">-X POST</span> envia dados como formulário.<br><span class="ec">-d "username=admin&password=password"</span> são as credenciais testadas.<br>Se aparecer <span class="eg">Location: index.php</span>, o sistema aceitou a senha padrão!</div>
+      <div class="box-ok"><strong>✅ ACHADO CRÍTICO — CREDENCIAL PADRÃO ATIVA</strong>O sistema aceita <strong>admin / password</strong> sem exigir troca. Criticidade <strong>CRÍTICO</strong> no relatório.</div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">2.4</div><div class="passo-titulo">Salvar evidências do curl</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">curl</span> <span class="cf">-I</span> <span class="cv">http://localhost:8080</span> <span class="cf">&gt;</span> <span class="cv">/tmp/scan-curl.txt</span></span></div>
+          <div class="term-out g">← salvo em /tmp/scan-curl.txt</div>
+        </div>
+      </div>
+      <div class="explicacao">O <span class="eg">&gt;</span> redireciona a saída para um arquivo. Este arquivo será evidência no relatório.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FASE 3 — DoS -->
+<div class="section-title"><span class="sn">03</span> Fase 3 — Simulação de DoS (negação de serviço)</div>
+<div class="phase-card">
+  <div class="phase-hdr">
+    <div class="phase-num pn-orange">03</div>
+    <div>
+      <div class="phase-title">Sobrecarregar o servidor com muitas requisições</div>
+      <div class="phase-desc">Um ataque DoS (Denial of Service) tenta derrubar um serviço enviando mais requisições do que ele consegue processar. Aqui vamos simular isso dentro do nosso container.</div>
+    </div>
+    <div class="phase-time">⏱ 15 min</div>
+  </div>
+  <div class="phase-body">
+
+    <div class="objetivo">
+      <strong>🎯 O QUE VOCÊ VAI APRENDER</strong>
+      Como um servidor reage quando recebe requisições demais ao mesmo tempo — e por que aplicações sem proteção ficam lentas ou param de responder.
+    </div>
+
+    <div class="box-warn" style="margin-bottom:18px">
+      <strong>⚠️ APENAS NO CONTAINER LOCAL</strong>
+      O comando abaixo funciona <strong>exclusivamente contra localhost:8080</strong> — o container que você mesmo subiu. Nunca aponte para qualquer outro endereço. DoS em servidores externos é crime.
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">3.1</div><div class="passo-titulo">Verificar o servidor respondendo normalmente</div></div>
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:10px;line-height:1.6">Antes do ataque, abra o navegador em <strong>http://localhost:8080</strong> e veja o site carregando normalmente. Deixe essa aba aberta para comparar depois.</p>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">curl</span> <span class="cf">-o</span> <span class="cv">/dev/null</span> <span class="cf">-s</span> <span class="cf">-w</span> <span class="cv">"%{time_total}\n"</span> <span class="cv">http://localhost:8080</span></span></div>
+          <div class="term-out g">0.043 ← tempo de resposta normal em segundos (menos de 1s)</div>
+        </div>
+      </div>
+      <div class="explicacao">Este comando mede o <strong>tempo de resposta</strong> do servidor. Guarde esse número — você vai comparar com o tempo <em>durante</em> o ataque.<br><span class="ec">-o /dev/null</span> descarta o conteúdo, <span class="eg">-w "%{time_total}"</span> mostra só o tempo total.</div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">3.2</div><div class="passo-titulo">Disparar o ataque DoS com Apache Benchmark (ab)</div></div>
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:10px;line-height:1.6">O <strong>ab</strong> (Apache Benchmark) é uma ferramenta legítima de teste de carga. Vamos usá-la para enviar muitas requisições simultâneas ao servidor. Digite tudo em uma linha:</p>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali# (tudo em uma linha)</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">ab</span> <span class="cf">-n</span> <span class="cv">5000</span> <span class="cf">-c</span> <span class="cv">100</span> <span class="cv">http://localhost:8080/</span></span></div>
+          <div class="term-out c">This is ApacheBench, Version 2.3</div>
+          <div class="term-out y">Benchmarking localhost (be patient)...</div>
+          <div class="term-out y">Completed 500 requests</div>
+          <div class="term-out y">Completed 1000 requests...</div>
+          <div class="term-out g">Concurrency Level:      100</div>
+          <div class="term-out g">Time taken for tests:   X.XXX seconds</div>
+          <div class="term-out g">Requests per second:    XXX.XX [#/sec]</div>
+          <div class="term-out r">Failed requests:        XX  ← servidor começou a falhar!</div>
+        </div>
+      </div>
+      <div class="explicacao">
+        <span class="eg">-n 5000</span> = número total de requisições a enviar (5 mil).<br>
+        <span class="ec">-c 100</span> = número de requisições simultâneas (100 ao mesmo tempo).<br><br>
+        Enquanto o <strong>ab</strong> roda, tente recarregar o site no navegador — ele vai estar lento ou sem responder. Isso é o efeito do DoS na prática!<br><br>
+        Preste atenção na linha <span style="color:var(--red)">Failed requests</span>: ela mostra quantas requisições o servidor não conseguiu atender.
+      </div>
+      <div class="box-orange">
+        <strong>🔥 O QUE ESTÁ ACONTECENDO?</strong>
+        O Apache tem um limite de conexões simultâneas (MaxRequestWorkers). Quando todas as "vagas" estão ocupadas, o servidor começa a recusar novas conexões — é exatamente isso que um ataque DoS explora. Em vez de hackear o código, o atacante simplesmente <strong>esgota os recursos</strong> do servidor.
+      </div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">3.3</div><div class="passo-titulo">Medir o impacto — tempo de resposta durante o ataque</div></div>
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:10px;line-height:1.6">Abra um <strong>segundo terminal do Kali</strong> (em outro PowerShell, rode o Comando 2 novamente) e execute enquanto o ataque ainda está rodando no primeiro terminal:</p>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — segundo terminal — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">curl</span> <span class="cf">-o</span> <span class="cv">/dev/null</span> <span class="cf">-s</span> <span class="cf">-w</span> <span class="cv">"%{time_total}\n"</span> <span class="cv">http://localhost:8080</span></span></div>
+          <div class="term-out r">5.231 ← tempo de resposta DURANTE o ataque (muito maior!)</div>
+        </div>
+      </div>
+      <div class="explicacao">Compare os dois tempos medidos:<br>
+        <span class="eg">Antes do ataque:</span> &lt; 0.1 segundo<br>
+        <span class="ec">Durante o ataque:</span> vários segundos ou timeout<br><br>
+        Essa diferença é o <strong>impacto de disponibilidade</strong> — métrica principal num relatório de DoS.
+      </div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">3.4</div><div class="passo-titulo">Aumentar a intensidade (opcional)</div></div>
+      <p style="font-size:.83rem;color:var(--muted);margin-bottom:10px;line-height:1.6">Se o servidor aguentou bem, tente com mais requisições simultâneas:</p>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali# (tudo em uma linha)</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">ab</span> <span class="cf">-n</span> <span class="cv">10000</span> <span class="cf">-c</span> <span class="cv">200</span> <span class="cv">http://localhost:8080/</span></span></div>
+          <div class="term-out r">← servidor deve começar a rejeitar mais requisições</div>
+        </div>
+      </div>
+      <div class="explicacao">
+        <span class="eg">-n 10000</span> = 10 mil requisições totais.<br>
+        <span class="ec">-c 200</span> = 200 conexões simultâneas.<br><br>
+        Observe o resultado: quantas <span style="color:var(--red)">Failed requests</span>? O servidor chegou a parar de responder completamente?
+      </div>
+    </div>
+
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">3.5</div><div class="passo-titulo">Salvar resultados para o relatório</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali# (tudo em uma linha)</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">ab</span> <span class="cf">-n</span> <span class="cv">5000</span> <span class="cf">-c</span> <span class="cv">100</span> <span class="cv">http://localhost:8080/</span> <span class="cf">&gt;</span> <span class="cv">/tmp/scan-dos.txt</span></span></div>
+          <div class="term-out g">← resultado completo salvo em /tmp/scan-dos.txt</div>
+        </div>
+      </div>
+      <div class="explicacao">Salva o resultado completo do ab em arquivo — inclua no relatório como evidência da Fase 3.</div>
+    </div>
+
+    <hr class="div">
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.05em">🛡️ COMO SE DEFENDER — CONTRAMEDIDAS PARA ATAQUES DoS</p>
+    <table class="tabela">
+      <thead><tr><th>DEFESA</th><th>O QUE FAZ</th><th>ONDE CONFIGURAR</th></tr></thead>
+      <tbody>
+        <tr><td>Rate Limiting</td><td>Limita quantas requisições por IP por segundo</td><td style="color:var(--muted)">mod_evasive no Apache, nginx limit_req</td></tr>
+        <tr><td>Timeout baixo</td><td>Encerra conexões lentas antes de travar o servidor</td><td style="color:var(--muted)">Timeout e KeepAliveTimeout no Apache</td></tr>
+        <tr><td>WAF</td><td>Firewall que detecta e bloqueia padrões de ataque</td><td style="color:var(--muted)">ModSecurity, Cloudflare WAF</td></tr>
+        <tr><td>CDN / Load Balancer</td><td>Distribui o tráfego entre vários servidores</td><td style="color:var(--muted)">Cloudflare, AWS CloudFront, nginx upstream</td></tr>
+        <tr><td>Monitoramento</td><td>Alerta quando o tráfego sobe anormalmente</td><td style="color:var(--muted)">Grafana, Prometheus, Datadog</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- FASE 4 — JUNTAR EVIDÊNCIAS -->
+<div class="section-title"><span class="sn">04</span> Fase 4 — Juntar todas as evidências</div>
+<div class="phase-card">
+  <div class="phase-hdr">
+    <div class="phase-num pn-green">04</div>
+    <div>
+      <div class="phase-title">Criar arquivo único com todos os resultados</div>
+      <div class="phase-desc">Junta os resultados do nmap, curl e ab em um único arquivo para anexar no relatório.</div>
+    </div>
+    <div class="phase-time">⏱ 5 min</div>
+  </div>
+  <div class="phase-body">
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">4.1</div><div class="passo-titulo">Juntar os arquivos de saída</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">cat</span> <span class="cv">/tmp/scan-nmap.txt</span> <span class="cv">/tmp/scan-curl.txt</span> <span class="cv">/tmp/scan-dos.txt</span> <span class="cf">&gt;</span> <span class="cv">/tmp/evidencias.txt</span></span></div>
+          <div class="term-out g">← arquivo criado em /tmp/evidencias.txt</div>
+        </div>
+      </div>
+    </div>
+    <div class="passo">
+      <div class="passo-hdr"><div class="passo-num">4.2</div><div class="passo-titulo">Conferir o conteúdo</div></div>
+      <div class="terminal">
+        <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">KALI — root@kali#</span></div>
+        <div class="term-body">
+          <div class="term-line"><span class="prompt">root@kali#</span><span class="code"><span class="ck">cat</span> <span class="cv">/tmp/evidencias.txt</span></span></div>
+          <div class="term-out c">← deve aparecer o resultado dos três scans juntos</div>
+        </div>
+      </div>
+      <div class="explicacao">Se aparecer conteúdo dos três scans, está tudo certo. Esse é o arquivo de evidências para anexar no relatório.</div>
+    </div>
+  </div>
+</div>
+
+<!-- RELATÓRIO -->
+<div class="section-title"><span class="sn">REL</span> Relatório — Template de entrega</div>
+<div class="phase-card">
+  <div class="phase-hdr">
+    <div class="phase-num pn-red">DOC</div>
+    <div>
+      <div class="phase-title">Preencher e entregar o relatório</div>
+      <div class="phase-desc">Com base no que você encontrou, preencha cada seção. Seja específico — descreva o que viu, onde encontrou e qual o risco.</div>
+    </div>
+  </div>
+  <div class="phase-body">
+    <div class="relatorio">
+      <div class="rel-hdr">
+        <div class="shield">🛡️</div>
+        <div>
+          <h3>RELATÓRIO DE PENTEST — UMC LAB</h3>
+          <p>Preencha todos os campos com base na sua atividade</p>
+        </div>
+      </div>
+      <div class="rel-body">
+
+        <div class="rel-sec">
+          <h4>1. Identificação</h4>
+          <div class="grid2">
+            <div class="campo"><label>Nome do(s) aluno(s)</label><div class="fbox ph">ex: João Silva</div></div>
+            <div class="campo"><label>Data</label><div class="fbox ph">ex: 23/04/2026</div></div>
+            <div class="campo"><label>Container atacante</label><div class="fbox ph">kalilinux/kali-rolling</div></div>
+            <div class="campo"><label>Alvo testado</label><div class="fbox ph">vulnerables/web-dvwa — localhost:8080</div></div>
+          </div>
+        </div>
+
+        <div class="rel-sec">
+          <h4>2. Ferramentas utilizadas</h4>
+          <div class="campo">
+            <label>Liste cada ferramenta e o que ela fez</label>
+            <div class="fbox tall ph">
+              ex:<br>
+              • nmap — varreu as portas e descobriu versão do Apache<br>
+              • curl — inspecionou cabeçalhos HTTP e testou login<br>
+              • ab (Apache Benchmark) — simulou ataque DoS medindo impacto no servidor
+            </div>
+          </div>
+        </div>
+
+        <div class="rel-sec">
+          <h4>3. Portas e serviços encontrados</h4>
+          <div class="campo">
+            <label>O que o nmap encontrou? Formato: porta | serviço | versão</label>
+            <div class="fbox tall ph">ex: 8080/tcp | HTTP | Apache 2.4.x — servidor web principal do alvo</div>
+          </div>
+        </div>
+
+        <div class="rel-sec">
+          <h4>4. Vulnerabilidades encontradas</h4>
+          <div class="campo">
+            <label>O que é, onde está, qual o risco e como corrigir</label>
+            <div class="fbox tall ph">
+              [CRÍTICO] Credencial padrão ativa — admin/password<br>
+              Qualquer pessoa consegue entrar sem esforço. Correção: forçar troca de senha no primeiro acesso.<br><br>
+              [MÉDIO] Versão do Apache exposta no cabeçalho Server:<br>
+              Revela o software exato, facilitando ataques direcionados. Correção: ServerTokens Prod.<br><br>
+              [ALTO] Ausência de proteção contra DoS<br>
+              O servidor não tem rate limiting. Com -c 100 já apresentou falhas.<br>
+              Tempo de resposta: ANTES X.Xs | DURANTE X.Xs (aumento de X vezes).<br>
+              Correção: instalar mod_evasive e configurar rate limiting.
+            </div>
+          </div>
+        </div>
+
+        <div class="rel-sec">
+          <h4>5. Resultado do teste de DoS</h4>
+          <div class="campo">
+            <label>Preencha com os números do seu teste com ab</label>
+            <div class="fbox tall ph">
+              Ferramenta: ab (Apache Benchmark)<br>
+              Requisições enviadas: 5000<br>
+              Conexões simultâneas: 100<br>
+              Requisições com falha: ___ (linha "Failed requests" do resultado)<br>
+              Tempo de resposta antes do ataque: ___ segundos<br>
+              Tempo de resposta durante o ataque: ___ segundos<br>
+              O site ficou inacessível? Sim / Não
+            </div>
+          </div>
+        </div>
+
+        <div class="rel-sec">
+          <h4>6. Severidade geral dos achados</h4>
+          <p style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Qual a criticidade geral do que você encontrou nesta atividade?</p>
+          <div class="sev-row">
+            <div class="sev c">🔴 CRÍTICO</div>
+            <div class="sev h">🟠 ALTO</div>
+            <div class="sev m">🟡 MÉDIO</div>
+            <div class="sev l">🟢 BAIXO</div>
+            <div class="sev i">🔵 INFORMATIVO</div>
+          </div>
+        </div>
+
+        <div class="rel-sec">
+          <h4>7. Recomendações</h4>
+          <div class="campo">
+            <label>O que deveria ser corrigido num sistema real?</label>
+            <div class="fbox tall ph">
+              1. Trocar credenciais padrão imediatamente após a instalação<br>
+              2. Ocultar versão do Apache nos cabeçalhos (ServerTokens Prod)<br>
+              3. Adicionar cabeçalhos de segurança: X-Frame-Options, Content-Security-Policy, HSTS<br>
+              4. Implementar rate limiting com mod_evasive ou nginx limit_req<br>
+              5. Usar CDN ou load balancer para distribuir tráfego em caso de pico<br>
+              6. Configurar monitoramento de disponibilidade com alertas automáticos
+            </div>
+          </div>
+        </div>
+
+        <div class="rel-sec">
+          <h4>8. Conclusão pessoal</h4>
+          <div class="campo">
+            <label>O que você aprendeu? O que te surpreendeu?</label>
+            <div class="fbox tall ph">Escreva em suas próprias palavras: o que aprendeu nesta atividade, qual ferramenta achou mais interessante, e o que te surpreendeu no teste de DoS — como o servidor reagiu?</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <hr class="div">
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:10px;font-family:'JetBrains Mono',monospace;letter-spacing:.05em">✅ CHECKLIST — CONFIRA ANTES DE ENTREGAR</p>
+    <ul class="checklist">
+      <li><div class="cbox"></div><span>Nomes dos containers (atacante e alvo) identificados</span></li>
+      <li><div class="cbox"></div><span>nmap, curl e ab listados com o que cada um fez</span></li>
+      <li><div class="cbox"></div><span>Porta 8080 e serviço Apache descritos com versão</span></li>
+      <li><div class="cbox"></div><span>Pelo menos 3 vulnerabilidades descritas com localização e risco</span></li>
+      <li><div class="cbox"></div><span>Resultado do teste DoS preenchido com os números reais</span></li>
+      <li><div class="cbox"></div><span>Pelo menos 3 recomendações de correção escritas</span></li>
+      <li><div class="cbox"></div><span>Arquivo evidencias.txt salvo e disponível para entrega</span></li>
+      <li><div class="cbox"></div><span>Conclusão pessoal preenchida com suas próprias palavras</span></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ENCERRAMENTO -->
+<div class="section-title"><span class="sn">FIM</span> Encerrar o laboratório</div>
+<div class="phase-card">
+  <div class="phase-hdr">
+    <div class="phase-num pn-cyan">END</div>
+    <div>
+      <div class="phase-title">Remover os containers ao finalizar</div>
+      <div class="phase-desc">Se estiver dentro do Kali com root@kali#, escreva <strong>exit</strong> primeiro. Depois abra o PowerShell da sua máquina e rode os comandos abaixo, <strong>um por vez</strong>.</div>
+    </div>
+    <div class="phase-time">⏱ 1 min</div>
+  </div>
+  <div class="phase-body">
+    <div class="terminal">
+      <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">POWERSHELL — sua máquina (não o Kali!)</span></div>
+      <div class="term-body"><div class="term-line"><span class="prompt">PS&gt;</span><span class="code"><span class="ck">docker</span> <span class="cs">stop</span> <span class="cv">alvo-web</span></span></div><div class="term-out g">alvo-web ✓</div></div>
+    </div>
+    <div class="terminal" style="margin-top:8px">
+      <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">POWERSHELL — sua máquina (não o Kali!)</span></div>
+      <div class="term-body"><div class="term-line"><span class="prompt">PS&gt;</span><span class="code"><span class="ck">docker</span> <span class="cs">stop</span> <span class="cv">kali</span></span></div><div class="term-out g">kali ✓</div></div>
+    </div>
+    <div class="terminal" style="margin-top:8px">
+      <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">POWERSHELL — sua máquina (não o Kali!)</span></div>
+      <div class="term-body"><div class="term-line"><span class="prompt">PS&gt;</span><span class="code"><span class="ck">docker</span> <span class="cs">rm</span> <span class="cv">alvo-web</span></span></div><div class="term-out g">alvo-web removido ✓</div></div>
+    </div>
+    <div class="terminal" style="margin-top:8px">
+      <div class="term-bar"><div class="tdots"><div class="tdot r"></div><div class="tdot y"></div><div class="tdot g"></div></div><span class="term-label">POWERSHELL — sua máquina (não o Kali!)</span></div>
+      <div class="term-body"><div class="term-line"><span class="prompt">PS&gt;</span><span class="code"><span class="ck">docker</span> <span class="cs">rm</span> <span class="cv">kali</span></span></div><div class="term-out g">kali removido ✓</div></div>
+    </div>
+    <div class="box-tip" style="margin-top:14px">
+      <strong>💡 PRÓXIMA AULA</strong>
+      Para subir o lab novamente, basta rodar os mesmos 2 comandos do início. As imagens Docker ficam salvas localmente — não precisa baixar tudo de novo.
+    </div>
+  </div>
+</div>
+
+<div class="footer" style="margin-top:48px">
+  UMC · Pentest Básico com Docker · Ambiente 100% local e isolado<br>
+  <span>nmap · curl · ab · kalilinux/kali-rolling · vulnerables/web-dvwa</span>
+</div>
+
+</div>
+</body>
+</html>
